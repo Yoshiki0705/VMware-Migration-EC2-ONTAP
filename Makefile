@@ -142,8 +142,19 @@ diagrams-check: ## committed の図が spec と一致するか（AWS アイコ�
 .PHONY: drift
 drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow ## 逆戻り検出（設定の到達性 + 常時ロード予算 + 図の成果物 + ラベルの可読性と向き）
 
+.PHONY: gates
+# **どこでも走る集合**。~/.kiro を要求する agent-config、システムバイナリの shellcheck、
+# ネットワークを要る repo-names は入らない。CI・pre-commit フック・共同作業者の手元の
+# 3 か所がこの 1 つの定義を呼ぶ。
+#
+# ci.yml がこの一覧と一致していることは scripts/tests/test_ci_gate_parity.py が見る。
+# 以前は Makefile のコメントが「diagram-fonts / diagram-flow は CI で常時走らせる」と
+# 書いているのに ci.yml が drift を呼んでおらず、3 つの図の検査が一度も CI で走って
+# いなかった。集合を 2 か所に書くと、片方だけが更新される。
+gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow ## どこでも走る検査（CI とフックが呼ぶ）
+
 .PHONY: ci
-ci: lint format-check test cfn-lint security headings role-labels drift ## CI が呼ぶ集約ターゲット
+ci: gates agent-config ## CI が呼ぶ集約ターゲット（gates + ~/.kiro 依存の到達性検査）
 
 .PHONY: all
 all: ci ## ci の別名

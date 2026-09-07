@@ -65,12 +65,22 @@ LABEL_PATTERNS = (
     re.compile(r"^\*\*(?P<label>[^*]+)\*\*\s*[:：]"),
 )
 
-# 職種を名指すトークン。`SA` のような 2 文字の略語は散文に混ざるので入れない。
-# 分野名（FinOps、Reliability/Ops）は職種ではなく話題なので入れない。
+# 職種を名指すトークン。
+#
+# **この一覧は意味による線引きではなく、規約が名前を挙げた例の集合である。** きれいな
+# 「職種 vs 分野」の線は引けていない。規約は `AppSec lens` を禁止例として明記している
+# ので裸の `AppSec` が入り、裸の `FinOps` は挙げられていないので入らない。結果として
+# `（FinOps 観点）` は通り `**AppSec レンズ**` は落ちる。**これは不整合ではなく、規約の
+# 列挙をそのまま写した状態である。**「揃える」ために裸の `AppSec` を外すと、規約が
+# 名指している形を通すようになる。selftest がその 3 例を固定しているので、外すと落ちる。
+#
+# 略語のうち単独で職種を指すもの（SA / CISO / CTO / CIO / DPO）は入れる。日本語は語間に
+# 空白がないので `\b` が使えず、ASCII 英字だけを境界にする。
 ROLE = re.compile(
     r"(?:Specialist|Engineer|Architect|Practitioner|Officer|Analyst|Consultant"
     r"|Administrator|Developer|Manager|Reviewer|AppSec|DevOps Engineer|SRE"
     r"|Pre-Sales|Presales"
+    r"|(?<![A-Za-z])(?:SA|CISO|CTO|CIO|DPO)(?![A-Za-z])"
     r"|エンジニア|アーキテクト|スペシャリスト|コンサルタント|レビュアー|担当者|責任者|専門家)"
 )
 
@@ -103,15 +113,27 @@ CASES: list[tuple[str, bool]] = [
     ("## 前提の整理（Storage Specialist 観点）", True),
     ("#### 3c. ストレージ検証（VMware Specialist 観点）", True),
     ("### 設計判断（Security Engineer レンズ）", True),
-    ("> **AppSec レンズ**: 権限を絞る", True),
     ("> **Storage Specialist lens**: split needs capacity", True),
     ("**Data Protection Officer の視点**: 保持期間を確認する", True),
+    # --- 規約が禁止例として名指している 3 つ。ROLE から語を外すと、ここが落ちる ---
+    ("> **AppSec lens**: x", True),
+    ("> **FinOps Engineer lens**: x", True),
+    ("> **Chaos Engineering Practitioner lens**: x", True),
+    # --- 単独で職種を指す略語 ---
+    ("> **SRE レンズ**: x", True),
+    ("> **DPO の視点**: x", True),
+    ("> **CISO レンズ**: x", True),
+    ("#### 付録（SA 観点）", True),
     # --- 通過する: レンズ語だけ、または職種だけ ---
     ("## コストの観点から見た選択", False),
     ("> **Cost note**: セキュリティの観点からも確認します。", False),
     ("## Architecture", False),
+    # 分野名は規約の列挙に無いので通る。上の `AppSec` との差はここでは意図的である。
     ("#### 3d. コスト検証（FinOps 観点）", False),
+    ("#### 3e. 移行後運用検証（Reliability/Ops 観点）", False),
     ("> **Security note**: 権限を絞る", False),
+    # `SA` は ASCII 英字に挟まれていれば別語の一部であって職種ではない。
+    ("## USA 市場の観点", False),
     # --- 散文はラベルではない ---
     ("Storage Specialist の観点から書かれた記事を読んだ。", False),
     # --- フェンスの中は例示であって published なラベルではない ---
