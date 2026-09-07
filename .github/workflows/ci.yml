@@ -57,6 +57,10 @@ jobs:
       # matching fails the job instead of reporting an empty result as a pass.
       - name: Japanese heading style (noun phrases)
         run: make headings
+      # Same shape: the selftest runs first, so a rule that stopped matching
+      # fails the job rather than reporting an empty result as a pass.
+      - name: Role-name labels on notes and headings
+        run: make role-labels
 
       # `make drift` also runs the global steering/skills validator, which lives
       # in ~/.kiro and is not present on a runner. Only the repository-local half
