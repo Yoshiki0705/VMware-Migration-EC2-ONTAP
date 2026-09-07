@@ -64,6 +64,14 @@ fi
 #   SKIP_GATE=1 git commit …
 if [[ "${SKIP_GATE:-}" != "1" ]]; then
   echo "🔍 Running make gates..."
+  # The repository-name tests resolve sibling names against the GitHub API and
+  # skip when it cannot answer. Unauthenticated is 60 requests an hour, which a
+  # few commits in a row exhausts — and a skipped test protects nothing. Borrow
+  # the gh token when gh is installed; stay anonymous (and skip) when it is not.
+  if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh &> /dev/null; then
+    GITHUB_TOKEN=$(gh auth token 2>/dev/null || true)
+    export GITHUB_TOKEN
+  fi
   if ! make gates; then
     echo "❌ ERROR: gates failed. Fix them, or skip deliberately:"
     echo "   SKIP_GATE=1 git commit …"
