@@ -1,7 +1,7 @@
 # VMware to EC2 + FSx for ONTAP 移行パス検証
 
-[![CI](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/ci.yml/badge.svg)](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/ci.yml)
-[![Gitleaks](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/gitleaks.yml)
+[![CI](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/ci.yml/badge.svg)](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/ci.yml)
+[![Gitleaks](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/gitleaks.yml)
 
 🌐 **Language / 言語**: 日本語 (このページ) | [English](README.en.md)
 
@@ -18,6 +18,8 @@
 | VM Import/Export で移行したい | [VM Import 手順書](docs/ja/vm-import-procedure.md) | 20 min |
 | PoC 環境を構築したい | [クイックスタート](docs/ja/quickstart.md) | 15 min |
 | iSCSI LUN を設定したい | [iSCSI セットアップ](docs/ja/fsxn-iscsi-setup.md) | 15 min |
+
+> **移行ランブックに載らない前提**（切り戻せる時点、Finalize の容量ピーク、ACL 保持、LUN 配置と復旧の粒度）は、姉妹リポジトリの [FSx for ONTAP Adoption Playbook — 03 移行](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/playbooks/03-migrate/README.md) にあります。ここでは複製せず参照します。
 
 <details><summary>📂 全ドキュメント一覧</summary>
 
@@ -85,8 +87,8 @@ Path B ─ AWS Transform: Discovery → Wave Plan → MGN レプリケーショ�
 <details><summary>🔧 開発者向け</summary>
 
 ```bash
-git clone https://github.com/Yoshiki0705/vmware-migration-ec2-ontap.git
-cd vmware-migration-ec2-ontap
+git clone https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP.git
+cd VMware-Migration-EC2-ONTAP
 git config core.hooksPath .githooks
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
