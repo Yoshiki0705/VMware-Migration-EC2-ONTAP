@@ -114,6 +114,8 @@ Flow based on official documentation ([UserGuide: Migrate servers](https://docs.
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+> **Finalize is not part of the flow above.** It is an explicit, irreversible step taken after cutover, and it is **not cleanup — it is the step where physical capacity peaks**. Splitting the FlexClone temporarily needs one extra copy of the migrated data in physical capacity (held for about 9 minutes here; see 12.10 in the [GA verification report](./atx-fsxn-ga-verification.md)). Do not run it while free space in the aggregate is below the size of the migrated data.
+
 ### 3.2 Automated Agent Deployment via MGN Connector
 
 AWS Transform supports large-scale automated deployment of replication agents using the MGN Connector.
@@ -179,9 +181,11 @@ The MGN Connector connects to source VMs, so SSH keys and passwords are stored i
 - Storage format on FSx for ONTAP: placed as iSCSI LUN, or another format? → **To be determined during hands-on testing**
 - Continuity of ONTAP features (Snapshot lineage) after migration
 
-> **Storage Specialist lens (inference regarding ONTAP lineage)**: AWS Transform uses MGN-based **block-level replication**, which is fundamentally different from ONTAP's SnapMirror (volume-level logical replication). Therefore, **data on FSx for ONTAP after migration is likely to be in a "newly created LUN/volume" state** (Snapshot history and SnapMirror relationships are not carried over). This is not a limitation but a design characteristic — after migration, setting up new Snapshot policies / SnapMirror relationships on the FSx for ONTAP side resolves any operational concerns. However, if the requirement is to "maintain the existing Snapshot chain during migration," **Shift Toolkit (SnapMirror-based) is better suited**. This will be confirmed during hands-on testing.
+> **Storage note (inference regarding ONTAP lineage)**: AWS Transform uses MGN-based **block-level replication**, which is fundamentally different from ONTAP's SnapMirror (volume-level logical replication). Therefore, **data on FSx for ONTAP after migration is likely to be in a "newly created LUN/volume" state** (Snapshot history and SnapMirror relationships are not carried over). This is not a limitation but a design characteristic — after migration, setting up new Snapshot policies / SnapMirror relationships on the FSx for ONTAP side resolves any operational concerns. However, if the requirement is to "maintain the existing Snapshot chain during migration," **Shift Toolkit (SnapMirror-based) is better suited**. This will be confirmed during hands-on testing.
 >
 > ⚠️ **The above is an inference based on public information and is NOT confirmed. Verify the behavior during hands-on testing.**
+
+> **Post-migration LUN placement needs a tidying step.** As measured, every data disk of one server ended up as a LUN inside a single volume (see 12.3 in the [GA verification report](./atx-fsxn-ga-verification.md)). **What that placement decides is not performance but recovery granularity**: Snapshot and SnapMirror operate per volume, so LUNs in the same volume get a mutually consistent copy from one Snapshot and cannot be reverted individually. To revert per LUN, separate them after migration with `lun move` (not run here — U5).
 
 ### 3.4 Supported Regions
 
@@ -322,6 +326,8 @@ Problem detected
   └─ Step 6 (cutover) — issues found after cutover
       → Decide whether to continue with cutover instance or revert to source (7.5)
 ```
+
+> **This decision flow closes the moment a client starts writing on the target**, not at cutover. After that, simply reverting to the source loses data, and synchronization in the opposite direction (failback) has to be planned separately (7.5).
 
 ### 7.2 Agent Deployment Failure
 
