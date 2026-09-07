@@ -91,6 +91,14 @@ headings: ## 日本語の節見出しが体言止めか（本検査の前に自�
 	@$(PYTHON) $(HEADING_CHECK) --selftest >/dev/null
 	$(PYTHON) $(HEADING_CHECK)
 
+.PHONY: repo-names
+# ネットワークが必要なので ci には入れない。週次の repo-names.yml が呼ぶ。
+# 未認証の API は 1 時間 60 回なので、手元で繰り返すなら GITHUB_TOKEN を渡す:
+#   GITHUB_TOKEN=$$(gh auth token) make repo-names
+repo-names: ## 散文中のリポジトリ名がいまの名前か（旧名は GitHub が解決し続けるので他に出ない）
+	$(PYTHON) tools/check_repo_names.py --selftest >/dev/null
+	$(PYTHON) tools/check_repo_names.py
+
 .PHONY: agent-config
 agent-config: ## steering / skills / hooks の到達性（グローバル検証器）
 	$(PYTHON) $${KIRO_HOME:-$$HOME/.kiro}/hooks/scripts/validate_agent_config.py

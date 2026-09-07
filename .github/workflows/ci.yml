@@ -37,7 +37,14 @@ jobs:
       - name: Ruff format check
         run: make format-check
 
+      # The repository-name tests resolve sibling names against the GitHub API.
+      # They skip when the API cannot answer, so the job stays green without a
+      # token — but a skipped test protects nothing, and the anonymous allowance
+      # is 60 requests an hour per IP on shared runners. The token costs no extra
+      # permission beyond the read-only `contents` above.
       - name: Pytest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: make test
 
       - name: CloudFormation lint
