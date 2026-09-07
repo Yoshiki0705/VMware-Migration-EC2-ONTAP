@@ -293,11 +293,31 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Amazon FSx for NetApp ONTAP\n（データのステージング）",
         "en": "Amazon FSx for NetApp ONTAP\n(data staging)",
     },
-    "staging_flexvol": {
-        "ja": "ステージング FlexVol\nLUN × 2（ディスクごと）",
-        "en": "Staging FlexVol\n2 LUNs (one per disk)",
+    # 行と列の見出し。図 1 は「行 = インスタンス、列 = 領域」の表として読ませる。
+    "row_source": {
+        "ja": "移行元（本検証では Amazon EC2）",
+        "en": "Source (Amazon EC2 in this verification)",
     },
-    "boot_volume": {"ja": "ブート 8 GiB", "en": "Boot 8 GiB"},
+    "row_staging": {"ja": "ステージング", "en": "Staging"},
+    "row_cutover": {"ja": "カットオーバー後", "en": "After cutover"},
+    "col_boot": {"ja": "ブート / ルート領域", "en": "Boot / root area"},
+    "col_data": {"ja": "データ領域", "en": "Data area"},
+    "src_boot": {
+        "ja": "Amazon Elastic Block Store\n（ブート 8 GiB）",
+        "en": "Amazon Elastic Block Store\n(boot 8 GiB)",
+    },
+    "src_data": {
+        "ja": "Amazon Elastic Block Store\n（データ 4 GiB × 2）",
+        "en": "Amazon Elastic Block Store\n(data 4 GiB × 2)",
+    },
+    "tgt_boot": {
+        "ja": "Amazon Elastic Block Store\n（ルート 8 GiB）",
+        "en": "Amazon Elastic Block Store\n(root 8 GiB)",
+    },
+    "tgt_data": {
+        "ja": "Amazon FSx for NetApp ONTAP\n（ターゲット FlexVol・iSCSI）",
+        "en": "Amazon FSx for NetApp ONTAP\n(target FlexVol / iSCSI)",
+    },
     "privatelink": {"ja": "AWS PrivateLink", "en": "AWS PrivateLink"},
     "nlb": {
         "ja": "Network Load Balancer\n（自動作成）",
@@ -318,10 +338,8 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "ONTAP management endpoint\nREST API / 443",
     },
     "control_plane": {"ja": "管理経路", "en": "Control path"},
-    "staging_area": {"ja": "ステージング領域", "en": "Staging area"},
     "e_agent": {"ja": "ブロックレプリケーション", "en": "Block replication"},
-    "e_write": {"ja": "ブロックを書き込む", "en": "Writes blocks"},
-    "e_iscsi": {"ja": "iSCSI", "en": "iSCSI"},
+    "e_cutover": {"ja": "カットオーバー", "en": "Cutover"},
     # 矢印は Secrets Manager から AWS Transform へ向く。証明書が流れる向きに合わせると、
     # 矢頭が右下を向いて他の矢印と揃う。逆向き（「証明書を取得」）だと矢頭だけが左上を指す。
     "e_cert": {"ja": "クライアント証明書", "en": "Client certificate"},
@@ -503,103 +521,80 @@ def centred(icon: str, cx: int, cy: int) -> tuple[int, int]:
 
 
 def _data_path() -> Diagram:
-    """What MGN writes where, from the source disk to the cut-over instance.
+    """3 台の EC2 それぞれについて、ブート / ルート領域とデータ領域がどこに置かれるか。
 
-    Split out of a single 1500px "overview" figure that also carried the control path. At that
-    width the readability floor asks for `fontSize` 24, and the longest labels are parentheticals
-    under an 80px icon — 「（レプリケーションサーバー）」 is 224px at 16 alone — so a single row of
-    five columns cannot both meet the floor and keep its labels apart. Two figures each meet it.
+    **行がインスタンス、列が領域。** 以前の版は経路（誰が誰に書き込むか）を主役にしていたが、
+    それだと「3 台の EC2 に対して Amazon EBS と FSx for ONTAP がどう割り当たっているか」が
+    読めない。ステージングを 1 つの枠にまとめたことで、レプリケーションサーバーが何を持って
+    いるのかも見えなくなっていた。
 
-    **流れる向きは右と下だけ。** 以前の版は、レプリケーションサーバーから右の車線へ出て下り、
-    そこから左へ 400px 戻ってストレージのアイコンへ入っていた。1 本の矢印の中で右・下・左・下と
-    向きが変わるので、読者が経路を 1 本ずつ指で追わないと、どれがブートでどれがデータか分から
-    ない。向きを 2 つに限ると、追わずに位置で読める。
+    行を移行元 / ステージング / カットオーバー後の 3 段にし、列をブート / ルート領域とデータ
+    領域の 2 つに分けると、**ブートの列が 3 段とも Amazon EBS で、データの列だけが FSx for
+    ONTAP に変わる**ことが位置で読める。これが記事の主張そのものなので、図の構造が主張と
+    一致する。
 
-    そのために変えたのは 2 点。
+    Amazon EBS のアイコンが 4 回出るが、これは 4 本の別のボリュームなので重複ではない。
+    同じ列に同じアイコンが縦に並ぶこと自体が「ブートは常に EBS」を示している。
 
-    1. **ステージング領域を 1 枚の枠にまとめ、レプリケーションサーバーから出る矢印を 1 本にした。**
-       ブートとデータの行き先の違いは、枠の中の 2 行とそれぞれのラベルが示す。2 本の矢印で
-       示そうとすると、下の行へ入る 1 本が上の行の枠を跨ぐしかなく、車線を枠の外へ出すことに
-       なる。それが以前の版の左戻りの正体だった。
-    2. **ボリュームのボックスをアイコンの右に置いた。** アイコンから下へ線を引くとラベルを
-       貫くので、縦の連鎖はボックスからしか始められない。
-
-    枠から下のカットオーバー先へ向かう 2 本は枠の右外の車線を下る。x が違うだけでなく、
-    互いの水平区間が相手の縦線に当たらない順序（データ側を下に）にしてあるので、交差が 0 本。
+    向きは下だけ。段の間の 2 本以外にエッジは無い。アイコンから線を出さないので、アイコンの
+    下 46px を使うラベルを線が貫くことがない。所属は枠と列の位置が示す。
     """
     return Diagram(
         name="atx-fsxn-data-path",
         diagram_id="atx-fsxn-data-path",
-        # 815px。いちばん右にあるのはカットオーバー先 EC2 のラベル（右端 740）で、そこへ境界
-        # 2 枚分の余白を足した幅。この幅なら縮小が掛からず、ラベルは 16px のまま読者に届く。
-        width=815,
-        height=946,
+        # 949px。列幅は 3 つのラベルの実測（224 / 234 / 243）に列間 24px と境界 3 枚分の
+        # 余白を足しただけ。実効サイズは 16 × 880/973 = 14.5px。
+        width=949,
+        height=925,
         groups=(
-            Group("aws_cloud", "aws_cloud", 28, 30, 762, 886),
-            Group("vpc", "vpc", 53, 90, 712, 801, gr_icon="group_vpc2", kind="vpc", dashed=True),
+            Group("aws_cloud", "aws_cloud", 38, 30, 873, 865),
+            Group("vpc", "vpc", 63, 90, 823, 780, gr_icon="group_vpc2", kind="vpc", dashed=True),
         ),
-        # エッジが 1 つのアイコンではなく集合に着く必要があるので枠を使う。中の 2 行が
-        # ブートとデータの行き先の違いを持つ。
-        frames=(Frame("staging_area", "staging_area", 95, 330, 520, 342),),
-        boxes=(
-            Box("boot_volume", "boot_volume", 361, 382, 230, 56),
-            Box("staging_flexvol", "staging_flexvol", 361, 538, 230, 56),
+        # 段。エッジは 1 つのアイコンではなく段全体に着く。
+        frames=(
+            Frame("row_source", "row_source", 88, 175, 773, 190),
+            Frame("row_staging", "row_staging", 88, 415, 773, 190),
+            Frame("row_cutover", "row_cutover", 88, 655, 773, 190),
+        ),
+        # 列見出し。VPC のラベルは左上（x 93..338、y 96..120）にあるので、x 365 以降・y 125 は
+        # ぶつからない。
+        texts=(
+            Text("col_boot", "col_boot", 365, 125, 200, 34),
+            Text("col_data", "col_data", 627, 125, 200, 34),
         ),
         nodes=(
-            Node("source_ec2", "ec2", "source_ec2", *centred("ec2", 170, 190)),
-            Node("repl_ec2", "ec2", "repl_ec2", *centred("ec2", 460, 190)),
-            # 中心 225。英語の "Amazon FSx for NetApp ONTAP" はアイコンの下で 243px あり、
-            # 220 だと枠の左端 95 まで 3px しか残らない。
-            Node("ebs", "ebs", "ebs", *centred("ebs", 225, 410)),
-            Node("fsx_staging", "fsx_ontap", "fsx_staging", *centred("fsx_ontap", 225, 566)),
-            Node("target_ec2", "ec2", "target_ec2", *centred("ec2", 660, 780)),
+            # 列の中心は 212 / 465 / 727。最長ラベルは col3 の 243px で、枠の右端 861 まで
+            # 12px 残る。アイコンの中心 y は各枠の上端 + 80。
+            Node("source_ec2", "ec2", "source_ec2", *centred("ec2", 212, 255)),
+            Node("src_boot", "ebs", "src_boot", *centred("ebs", 465, 255)),
+            Node("src_data", "ebs", "src_data", *centred("ebs", 727, 255)),
+            Node("repl_ec2", "ec2", "repl_ec2", *centred("ec2", 212, 495)),
+            Node("stg_boot", "ebs", "ebs", *centred("ebs", 465, 495)),
+            Node("stg_data", "fsx_ontap", "fsx_staging", *centred("fsx_ontap", 727, 495)),
+            Node("target_ec2", "ec2", "target_ec2", *centred("ec2", 212, 735)),
+            Node("tgt_boot", "ebs", "tgt_boot", *centred("ebs", 465, 735)),
+            Node("tgt_data", "fsx_ontap", "tgt_data", *centred("fsx_ontap", 727, 735)),
         ),
         edges=(
+            # 段から段へ下るだけ。x=204（枠幅の 0.15）は左端の EC2 の列で、ラベル帯
+            # （y 295..341）より下の区間しか通らない。
             Edge(
                 "e1",
-                "source_ec2",
-                "repl_ec2",
+                "row_source",
+                "row_staging",
                 "e_agent",
-                exit_at=(1, 0.5),
-                entry_at=(0, 0.5),
-                offset=(0, 0, -14),
+                exit_at=(0.15, 1),
+                entry_at=(0.15, 0),
+                offset=(0, 110, 0),
             ),
-            # 右へ出て下り、枠の上端へ入る。車線 590 はレプリケーションサーバーのラベルの
-            # 右端 572 より外。ラベルの上を縦線が走ると、ラベルの 3 行目のように見える。
             Edge(
                 "e2",
-                "repl_ec2",
-                "staging_area",
-                "e_write",
-                exit_at=(1, 0.5),
-                entry_at=(0.952, 0),
-                points=((590, 190),),
-                offset=(0, 70, 0),
-            ),
-            # ラベルは要らない。隣のボックスが自分の名前を持っている。
-            Edge("e3", "ebs", "boot_volume", exit_at=(1, 0.5), entry_at=(0, 0.5)),
-            Edge("e4", "fsx_staging", "staging_flexvol", exit_at=(1, 0.5), entry_at=(0, 0.5)),
-            # 枠の外の車線を下る。ブートは 680、データは 640。**x を分けるだけでは足りない。**
-            # 680 は y 410..740、640 は y 566..740 を走り、どちらの水平区間も相手の縦線に
-            # 当たらない。逆順にすると 1 か所で交差する。
-            Edge(
-                "e5",
-                "boot_volume",
-                "target_ec2",
-                exit_at=(1, 0.5),
-                entry_at=(0.75, 0),
-                points=((680, 410),),
-            ),
-            Edge(
-                "e6",
-                "staging_flexvol",
-                "target_ec2",
-                "e_iscsi",
-                exit_at=(1, 0.5),
-                entry_at=(0.25, 0),
-                points=((640, 566),),
-                # 枠の下端 672 より下に置く。縦線の中点付近に置くと枠の右の枠線を跨ぐ。
-                offset=(0.6, -26, 0),
+                "row_staging",
+                "row_cutover",
+                "e_cutover",
+                exit_at=(0.15, 1),
+                entry_at=(0.15, 0),
+                offset=(0, 110, 0),
             ),
         ),
     )
