@@ -189,7 +189,7 @@ At the point of rejection the template was unchanged (`storageConfiguration` rem
 
 | Item | State |
 |---|---|
-| MGN | Not initialized. `initialize-service` fails (5.4) |
+| MGN | Not initialized. `initialize-service` fails because the IAM roles do not exist yet (5.4) |
 | FSx for ONTAP file systems | 2, both `AVAILABLE`, in separate VPCs |
 | File system configuration | Both `SINGLE_AZ_1` / 1024 GiB / 128 MBps |
 | SVMs | 9, all `CREATED`. 3 of them are AD-joined |
@@ -245,7 +245,9 @@ The fsxadmin secret description also warns that the secrets for the two file sys
 
 **Blast radius of replication (6 onward)**: running a migration requires disabling automatic backups and ARP (8.3), and both are **file-system-scope settings**. The candidate file system hosts 25 volumes belonging to other workstreams, so disabling them would extend to the data protection of that work. In addition, the capacity guidance is 3x the migration data with SSD utilization at or below 80%, and roughly 1,166 GiB is already thin-provisioned against a 1024 GiB file system, so actual usage must be established first.
 
-### 5.4 The initialize-service failure [Measured / 2026-09-04]
+### 5.4 The prerequisite initialize-service needs [Measured / 2026-09-04, corrected 2026-09-08]
+
+> **Correction**: this section originally recorded a reproducible CLI initialization failure as a defect. **It is not a defect — it was our procedural error.** The API path expects the customer to create 8 IAM roles first, which is step 1 of [Initializing AWS Transform MGN with the API](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html). `initialize-service` creates the service-linked role, creates instance profiles and attaches **existing** roles to them; it does not create the roles. The original observations are kept below, with the basis for the correction at the end.
 
 MGN initialization fails reproducibly.
 
@@ -274,7 +276,7 @@ Factors ruled out during triage:
 | SCP denial | This is the Organizations management account, and SCPs do not apply to it |
 | IAM quota exhaustion | 452 / 1000 roles, 40 / 1000 instance profiles |
 | Name collision with existing resources | No roles of those names exist |
-| IAM errors in CloudTrail | No IAM events for that window appear in either ap-northeast-1 or us-east-1 event history, so the failure is internal |
+| IAM errors in CloudTrail | ~~No IAM events for that window appear in either region~~ → **this check was wrong.** They are in us-east-1 (see the correction below). The lookup at the time most likely used the wrong window: CloudTrail renders timestamps in local time while `--start-time` / `--end-time` are read as UTC |
 
 Agent-based replication requires these instance profiles and roles, so **E2E verification cannot proceed until this failure is resolved**. Template configuration (4.4) does not require initialization, which is why it could be measured.
 
@@ -289,7 +291,30 @@ Initialization created 9 roles, including every one the CLI path failed to creat
 
 The presence of these two roles shows that FSx for ONTAP support is reflected in the role set at initialization time. That explains why environments initialized before FSx for ONTAP support existed need `Reinitialize Service Permissions` on the template page.
 
-**Implication**: reading the CLI `initialize-service` failure as an account-side problem would be a mistake. It is a difference between the console and the CLI, and when the CLI fails, initializing from the console lets work proceed. The 4 empty instance profiles created by the CLI were deleted before initializing from the console.
+#### The basis for the correction [Measured / 2026-09-08]
+
+CloudTrail in us-east-1 — IAM is a global service, so its events land there — shows the call sequence at the time of the failure.
+
+| Path | `CreateRole` calls | Sequence observed |
+|---|---|---|
+| CLI (2026-09-03 20:31 UTC, failed) | **0** | `CreateServiceLinkedRole` → `CreateInstanceProfile` × 4 → `AddRoleToInstanceProfile` × 4, all four with `NoSuchEntityException` (`The role with name AWSApplicationMigration...Role cannot be found.`) |
+| Console (2026-09-04 06:13 UTC, succeeded) | **8** | Roles created, then attached to the profiles |
+
+`initialize-service` never attempts to create a role. It fails attaching roles that do not exist, which matches [the API initialization page](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html):
+
+> Once the policies are attached to the roles, run the `aws mgn initialize-service` command. This will automatically create the service-linked role, create instance profiles, and add Roles to Instance Profiles.
+
+**The correct sequence** for the API / IaC path:
+
+1. Create the 8 roles with `CreateRole` and attach the managed policies the page lists. With FSx for ONTAP as the target, `AWSApplicationMigrationFsxProxyRole` and `AWSApplicationMigrationFsxProxyLinkRole` are among those 8
+2. `aws mgn initialize-service`
+3. `aws mgn create-replication-configuration-template` and `aws mgn create-launch-configuration-template`
+
+**Re-verification**: with the roles in place, `aws mgn initialize-service --region ap-northeast-1` succeeds (exit 0, measured 2026-09-08). **That re-run has no control**, though: reproducing the failing condition would mean deleting the roles and breaking a live verification environment, so it was not done. The evidence is the CloudTrail record above, not the successful re-run.
+
+**Implication**: reading this as a CLI defect or an account-side problem would be a mistake. **The prerequisite for the API path is documented and we had not met it.** The console path succeeded because the console creates the roles on your behalf.
+
+> **An inconsistency that remains in the documentation**: the same page opens by describing initialization as "The required IAM roles and policies will be created." Read together with step 1, which asks the customer to create them, that invites the misreading on the API path. It stays as F4.
 
 ---
 
@@ -564,7 +589,7 @@ The mapping between the Playbook evidence tiers and this report's tags is given 
 | U6 | Minimum ONTAP version requirement | Unverified | No statement found in public documentation (searched 2026-09-04) |
 | U7 | GA status of EVS + FSx for ONTAP | Unverified | No GA announcement found (searched 2026-09-04) |
 | U8 | Correspondence between `SETUP_FSX_PROXY` and automatic PrivateLink establishment | **Resolved** (12.2) | Creation of an NLB and a VPC endpoint service measured, with `mgn.amazonaws.com` as the allowed principal |
-| U9 | Root cause of the `initialize-service` (CLI) failure | Unverified | Internal error. No IAM errors in CloudTrail. **No longer an E2E blocker, since the console path succeeds** (5.4) |
+| U9 | Root cause of the `initialize-service` (CLI) failure | **Resolved** | Not a defect. The API path expects 8 IAM roles to be created first and they were not. CloudTrail in us-east-1 records the `AddRoleToInstanceProfile` `NoSuchEntityException` (5.4) |
 | U10 | Whether MGN initialization succeeds from the console | **Resolved** (5.4) | Succeeded. 9 roles created, including the 2 FSx-specific ones |
 | U11 | Actual SSD usage on the candidate file system | **Resolved** (5.6) | Aggregate 861.8 GiB, 50.0 GiB used, 5.8% utilization |
 | U12 | Completing the template save (committing the FSx for ONTAP configuration) | **Resolved** (4.6) | Certificate authentication verified with a negative control, and the save confirmed by API read-back |

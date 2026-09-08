@@ -53,7 +53,7 @@ When MGN is not initialized, opening `Settings → Replication template` redirec
 
 The explanatory text states that continuing authorizes AWS Transform MGN to create all the IAM roles needed for data replication and for launching migrated servers. Choose `Set up service`.
 
-> **The CLI can fail here**: environments have been observed where `aws mgn initialize-service` fails reproducibly with `ValidationException: Failed to create SLR or instance profiles` (`reason: OTHER`), while console initialization succeeds. When the CLI fails it leaves behind the service-linked role plus **four instance profiles with no role attached**. Deleting those empty profiles before initializing from the console makes the resulting state easier to read. See [verification report 5.4](./atx-fsxn-ga-verification.md).
+> **The CLI / API path has a prerequisite**: `aws mgn initialize-service` does not create IAM roles. The documented sequence is to create the 8 roles and attach their managed policies first ([step 1 of API initialization](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html)); running it before that fails with `ValidationException: Failed to create SLR or instance profiles` (`reason: OTHER`). The failure leaves the service-linked role plus **four instance profiles with no role attached**, so delete those before retrying to keep the state readable. The console path creates the roles for you, so it succeeds without the prerequisite. See [verification report 5.4](./atx-fsxn-ga-verification.md).
 
 Once initialization completes, a "default template created" notification appears.
 
