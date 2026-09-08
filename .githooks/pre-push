@@ -1,0 +1,65 @@
+#!/bin/bash
+set -euo pipefail
+
+# Run the gates before anything leaves this machine.
+#
+# Why this exists in addition to pre-commit: **four git operations create commits
+# without invoking pre-commit.** Measured on git 2.54.0 in a scratch repository
+# with a marker hook:
+#
+#   git commit             runs pre-commit
+#   git commit --amend     runs pre-commit
+#   git rebase --continue  BYPASSES it
+#   git merge --no-ff      BYPASSES it
+#   git cherry-pick        BYPASSES it
+#   git revert             BYPASSES it
+#
+# A conflict resolved by hand during a rebase therefore produces commits that
+# never saw a gate. `git merge` has `pre-merge-commit`, but rebase, cherry-pick
+# and revert have no pre-commit equivalent, so covering them one at a time is not
+# possible. Push is the one chokepoint every path passes through.
+#
+# pre-commit stays for fast feedback on the common path; this is the guarantee.
+#
+# Skip deliberately, the same switch as pre-commit:
+#   SKIP_GATE=1 git push …
+#
+# `--no-verify` also skips it, which is the documented way out and is fine — the
+# point is that skipping has to be chosen, not inherited from how the commit was
+# made.
+
+if [[ "${SKIP_GATE:-}" == "1" ]]; then
+  exit 0
+fi
+
+# stdin carries "<local ref> <local sha> <remote ref> <remote sha>" per ref. An
+# all-zero local sha is a branch deletion, which ships no code to check.
+only_deletions=true
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  if [[ "$local_sha" =~ ^0+$ ]]; then
+    continue
+  fi
+  only_deletions=false
+done
+
+if [[ "$only_deletions" == true ]]; then
+  exit 0
+fi
+
+echo "🔍 Running make gates before push..."
+
+# Same reason as pre-commit: the repository-name tests resolve sibling names
+# against the GitHub API and skip when it cannot answer. A skipped test protects
+# nothing, and unauthenticated is 60 requests an hour.
+if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh &> /dev/null; then
+  GITHUB_TOKEN=$(gh auth token 2>/dev/null || true)
+  export GITHUB_TOKEN
+fi
+
+if ! make gates; then
+  echo "❌ ERROR: gates failed. Nothing pushed. Fix them, or skip deliberately:"
+  echo "   SKIP_GATE=1 git push …"
+  exit 1
+fi
+
+echo "✅ Pre-push checks passed"

@@ -3,7 +3,7 @@
 **Purpose**: Establish the scope of Amazon FSx for NetApp ONTAP support GA in AWS Transform (ATX) from primary sources, and record hands-on findings from a verification account (ap-northeast-1) with verified and unverified claims kept separate.
 
 **Last Updated**: 2026-09-04
-**Status**: Measured from scope confirmation through initialization, certificate authentication, saving the configuration, running replication, launching a test instance, and checking data integrity. **Finalize deliberately not run**
+**Status**: Measured from scope confirmation through initialization, certificate authentication, saving the configuration, running replication, launching a test instance, and checking data integrity, and **Finalize was run with approval** (12.10). Teardown complete (Section 13)
 
 ---
 
@@ -343,7 +343,7 @@ The constraint on the FSx for ONTAP target is **agent-based replication only** [
 | Elapsed times (initial sync, cutover) | **Measured** (12.1, 12.9) |
 | Real behaviour of LUN / volume conversion | **Measured** (12.3, 12.9) |
 | Time taken for FlexClone creation | **Measured**; included in the 337s LAUNCH phase (12.9) |
-| Time taken for the split at Finalize | Not run (irreversible; `split_estimate` about 7.93 GiB) |
+| Time taken for the split at Finalize | **Measured**; starts about 3 minutes in and finishes in under 60s (7.93 GiB, 12.10) |
 | EC2-source-specific pitfalls | **Two found**: `/tmp` tmpfs exhaustion (12.5) and assignment inversion from NVMe device re-enumeration (12.8) |
 
 ### 6.3 Absence of a blocker
@@ -518,7 +518,7 @@ On **cutover downtime**, the blog states that the window is limited to the time 
 
 For the same reason, the blog's "Multi-AZ HA with automatic failover and zero RPO" presumes a Multi-AZ deployment. Both file systems in this verification environment are Single-AZ, so that characteristic does not apply here (5.1).
 
-## 10. Coordination with fsxn-adoption-playbook
+## 10. Coordination with the FSx for ONTAP Adoption Playbook
 
 The sibling repository [FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) contains content that should be updated to reflect this GA.
 
@@ -557,10 +557,10 @@ The mapping between the Playbook evidence tiers and this report's tags is given 
 | # | Item | Status | Why |
 |---|---|---|---|
 | U1 | That FSx for ONTAP can be specified as a target | **Resolved** (4.4, 4.5) | Measured via both the API and the console. Screenshots captured |
-| U2 | End-to-end migration execution | **Resolved** (section 12) | Completed through test-instance launch, with data integrity matching. Finalize not run |
+| U2 | End-to-end migration execution | **Resolved** (section 12) | Completed from test-instance launch through cutover and **Finalize** (12.10), with data integrity matching |
 | U3 | Elapsed times | **Resolved** (12.1, 12.9) | Initial full sync 226s. With the correct sequence, the MGN job took 649s and 817s elapsed from T0 to boot confirmation. A single measurement; other configurations not measured |
 | U4 | Real behaviour of LUN / volume conversion | **Resolved** (12.3, 12.4, 12.9) | One parent volume plus a LUN per disk, the FlexClone, two igroups, and two multipath devices all measured. Timestamps map the SNAPSHOT phase to a volume Snapshot and the LAUNCH phase to FlexClone creation |
-| U5 | Real behaviour of post-migration optimization via `lun move start` | Unverified | Depends on U2 |
+| U5 | Real behaviour of post-migration optimization via `lun move start` | Unverified | U2 is resolved, but `lun move` after migration was not run here. Straight after migration every LUN of one server sits in a single volume (12.3), so this is needed when recovery granularity has to be separated |
 | U6 | Minimum ONTAP version requirement | Unverified | No statement found in public documentation (searched 2026-09-04) |
 | U7 | GA status of EVS + FSx for ONTAP | Unverified | No GA announcement found (searched 2026-09-04) |
 | U8 | Correspondence between `SETUP_FSX_PROXY` and automatic PrivateLink establishment | **Resolved** (12.2) | Creation of an NLB and a VPC endpoint service measured, with `mgn.amazonaws.com` as the allowed principal |
@@ -945,7 +945,7 @@ The target volume has `is_flexclone: true`, with `parent_volume` set to the stag
 
 First, **the SNAPSHOT phase is a metadata operation rather than a copy**, taking 44s for 8 GiB of data. Unlike an EBS-snapshot path, its growth with data volume can be expected to be gentle. But **this verification is a single data point** and the growth curve was not measured.
 
-Second, **the target volume depends on a Snapshot inside the staging volume**. Physical consumption right after launch is only the delta; the `space.used` on both volumes (about 7.9 GiB each) is a logical figure. Because of this dependency, **for Finalize to delete the staging volume it must either split the FlexClone or control the deletion order**. A split entails about 7.93 GiB of writes. The real behaviour of Finalize is unverified because it was not run (U16).
+Second, **the target volume depends on a Snapshot inside the staging volume**. Physical consumption right after launch is only the delta; the `space.used` on both volumes (about 7.9 GiB each) is a logical figure. Because of this dependency, **for Finalize to delete the staging volume it must either split the FlexClone or control the deletion order**. A split entails about 7.93 GiB of writes. **This projection matched the measurement in 12.10** (U16 resolved).
 
 #### ONTAP-side resource naming (measured)
 
@@ -1185,4 +1185,4 @@ Primary sources only.
 
 ---
 
-*This report is based on public documentation as of 2026-09-04 and hands-on checks in a verification account (ap-northeast-1). Console initialization, certificate authentication, and saving `FSX_ONTAP` onto the replication template were all measured. Nothing from running replication onward was performed.*
+*This report is based on public documentation as of 2026-09-04 and hands-on checks in a verification account (ap-northeast-1). Console initialization and certificate authentication, saving `FSX_ONTAP` onto the replication template, and everything from running replication through cutover, Finalize, and teardown were measured (Sections 12 and 13). What remains unverified is in Section 11.*

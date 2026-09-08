@@ -91,6 +91,21 @@ headings: ## 日本語の節見出しが体言止めか（本検査の前に自�
 	@$(PYTHON) $(HEADING_CHECK) --selftest >/dev/null
 	$(PYTHON) $(HEADING_CHECK)
 
+.PHONY: role-labels
+# ネットワーク不要なので ci に入れる。語の禁止ではなく「職種トークンとレンズ語の同居」を
+# 見る。語だけを禁じると「セキュリティの観点から」に発火し、allow を付けられて死ぬ。
+role-labels: ## ラベルが職種名を名乗っていないか（所見ではなくラベルだけの問題）
+	$(PYTHON) tools/check_role_labels.py --selftest >/dev/null
+	$(PYTHON) tools/check_role_labels.py
+
+.PHONY: repo-names
+# ネットワークが必要なので ci には入れない。週次の repo-names.yml が呼ぶ。
+# 未認証の API は 1 時間 60 回なので、手元で繰り返すなら GITHUB_TOKEN を渡す:
+#   GITHUB_TOKEN=$$(gh auth token) make repo-names
+repo-names: ## 散文中のリポジトリ名がいまの名前か（旧名は GitHub が解決し続けるので他に出ない）
+	$(PYTHON) tools/check_repo_names.py --selftest >/dev/null
+	$(PYTHON) tools/check_repo_names.py
+
 .PHONY: agent-config
 agent-config: ## steering / skills / hooks の到達性（グローバル検証器）
 	$(PYTHON) $${KIRO_HOME:-$$HOME/.kiro}/hooks/scripts/validate_agent_config.py
@@ -127,8 +142,19 @@ diagrams-check: ## committed の図が spec と一致するか（AWS アイコ�
 .PHONY: drift
 drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow ## 逆戻り検出（設定の到達性 + 常時ロード予算 + 図の成果物 + ラベルの可読性と向き）
 
+.PHONY: gates
+# **どこでも走る集合**。~/.kiro を要求する agent-config、システムバイナリの shellcheck、
+# ネットワークを要る repo-names は入らない。CI・pre-commit フック・共同作業者の手元の
+# 3 か所がこの 1 つの定義を呼ぶ。
+#
+# ci.yml がこの一覧と一致していることは scripts/tests/test_ci_gate_parity.py が見る。
+# 以前は Makefile のコメントが「diagram-fonts / diagram-flow は CI で常時走らせる」と
+# 書いているのに ci.yml が drift を呼んでおらず、3 つの図の検査が一度も CI で走って
+# いなかった。集合を 2 か所に書くと、片方だけが更新される。
+gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow ## どこでも走る検査（CI とフックが呼ぶ）
+
 .PHONY: ci
-ci: lint format-check test cfn-lint security headings drift ## CI が呼ぶ集約ターゲット
+ci: gates agent-config ## CI が呼ぶ集約ターゲット（gates + ~/.kiro 依存の到達性検査）
 
 .PHONY: all
 all: ci ## ci の別名

@@ -15,7 +15,7 @@ gitignored and holds only a loader that says when to read what.
 
 ```bash
 make install   # .venv を固定版で用意
-make ci        # lint format-check test cfn-lint security drift
+make ci        # gates（CI と pre-commit が呼ぶ集合）+ agent-config
 ```
 
 Never commit VMware or ONTAP credentials, personal names, AWS account IDs, or

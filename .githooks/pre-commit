@@ -1,6 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
+# Refuse to commit on the default branch.
+#
+# Measured: a branch was created, the session moved back to main without that
+# being noticed, and a commit landed on main. Nothing was pushed, and recovery
+# was a branch-pointer move — but the only thing standing between the mistake
+# and a push was remembering to look. "Remember to run git status" is not a
+# control; it fails exactly when attention is elsewhere, which is when the
+# mistake happens.
+#
+# Override deliberately when a direct commit is intended:
+#   ALLOW_MAIN_COMMIT=1 git commit …
+BRANCH=$(git symbolic-ref --quiet --short HEAD || echo "")
+if [[ "$BRANCH" =~ ^(main|master)$ ]] && [[ "${ALLOW_MAIN_COMMIT:-}" != "1" ]]; then
+  echo "❌ ERROR: refusing to commit directly on '$BRANCH'."
+  echo "   Create a branch:  git switch -c fix/<short-description>"
+  echo "   Or override:      ALLOW_MAIN_COMMIT=1 git commit …"
+  exit 1
+fi
+
 # Allowed author domains. Matched on the domain rather than a full address so
 # that no personal address is published in this tracked file.
 ALLOWED_EMAIL_DOMAINS='netapp\.com|wisteria-field-japan\.com'
@@ -21,6 +40,43 @@ WORKFLOW_FILES=$(git diff --cached --name-only -- '.github/workflows/*.yml' '.gi
 if [[ -n "$WORKFLOW_FILES" ]] && command -v zizmor &> /dev/null; then
   echo "🔍 Running zizmor on changed workflow files..."
   echo "$WORKFLOW_FILES" | xargs zizmor
+fi
+
+# Run the gates, so a failure cannot be hidden upstream.
+#
+# Measured twice on a sibling project: `make all | tail -4 && git commit` — the
+# pipe returns tail's status, so `&&` never sees the lint failure. The second time
+# the output was on screen and the failure was read past. Both were caught only by
+# CI, which is to say the only thing that worked was downstream of the mistake.
+#
+# git reads this hook's own exit status, so however the command line is piped, a
+# failing gate stops the commit. That converts a thing to remember into a thing
+# that cannot be skipped by accident.
+#
+# `gates` is the portable set: no ~/.kiro, no network, no system binaries beyond
+# the pinned Python tools. About 4 seconds here.
+#
+# Caveat worth knowing: this inspects the working tree, not the staged content.
+# With unstaged edits present it validates something other than what is being
+# committed. Staging the tree before committing keeps the two the same.
+#
+# Skip deliberately when committing work in progress:
+#   SKIP_GATE=1 git commit …
+if [[ "${SKIP_GATE:-}" != "1" ]]; then
+  echo "🔍 Running make gates..."
+  # The repository-name tests resolve sibling names against the GitHub API and
+  # skip when it cannot answer. Unauthenticated is 60 requests an hour, which a
+  # few commits in a row exhausts — and a skipped test protects nothing. Borrow
+  # the gh token when gh is installed; stay anonymous (and skip) when it is not.
+  if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh &> /dev/null; then
+    GITHUB_TOKEN=$(gh auth token 2>/dev/null || true)
+    export GITHUB_TOKEN
+  fi
+  if ! make gates; then
+    echo "❌ ERROR: gates failed. Fix them, or skip deliberately:"
+    echo "   SKIP_GATE=1 git commit …"
+    exit 1
+  fi
 fi
 
 echo "✅ Pre-commit checks passed"

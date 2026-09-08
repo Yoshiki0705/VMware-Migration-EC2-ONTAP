@@ -3,6 +3,12 @@ Description: >
   Shift Toolkit PoC Environment - VPC + FSx for ONTAP + EC2 Target Instances
   For VMware ESXi to EC2/FSx for ONTAP migration verification.
 
+# The `Project` tag value below is a cost-allocation tag string, not a reference
+# to the GitHub repository, so it deliberately keeps its lower-case form even
+# though the repository is now VMware-Migration-EC2-ONTAP. Changing it would
+# split existing cost reports at the rename. tools/check_repo_names.py only
+# inspects github.com URLs in prose, so this is not a gap in that check.
+
 # ==============================================================================
 # Parameters
 # ==============================================================================

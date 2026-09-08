@@ -1,7 +1,7 @@
 # VMware to EC2 + FSx for ONTAP Migration Path Verification
 
-[![CI](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/ci.yml/badge.svg)](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/ci.yml)
-[![Gitleaks](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/Yoshiki0705/vmware-migration-ec2-ontap/actions/workflows/gitleaks.yml)
+[![CI](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/ci.yml/badge.svg)](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/ci.yml)
+[![Gitleaks](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP/actions/workflows/gitleaks.yml)
 
 🌐 **Language / 言語**: [日本語](README.md) | English (this page)
 
@@ -18,6 +18,8 @@
 | Migrate with VM Import/Export | [VM Import Procedure](docs/en/vm-import-procedure.md) | 20 min |
 | Set up PoC environment | [Quick Start](docs/en/quickstart.md) | 15 min |
 | Configure iSCSI LUNs | [iSCSI Setup](docs/en/fsxn-iscsi-setup.md) | 15 min |
+
+> **The parts that a migration runbook does not carry** — where the rollback window closes, the capacity peak at Finalize, ACL preservation, and how LUN placement decides recovery granularity — are in the sibling repository [FSx for ONTAP Adoption Playbook — 03 Migrate](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/playbooks/03-migrate/README.md). Referenced rather than copied here.
 
 <details><summary>📂 All Documents</summary>
 
@@ -85,8 +87,8 @@ Details: [PoC Plan Template](docs/en/poc-plan-template.md)
 <details><summary>🔧 For Developers</summary>
 
 ```bash
-git clone https://github.com/Yoshiki0705/vmware-migration-ec2-ontap.git
-cd vmware-migration-ec2-ontap
+git clone https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP.git
+cd VMware-Migration-EC2-ONTAP
 git config core.hooksPath .githooks
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt

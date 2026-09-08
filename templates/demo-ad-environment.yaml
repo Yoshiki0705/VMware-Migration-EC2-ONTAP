@@ -5,6 +5,12 @@ Description: >
   AD Connector or Direct Connect/VPN). Deploys AD Connector and configures
   networking for FSx for ONTAP SVM to join an on-premises AD domain.
 
+# The `Project` tag value below is a cost-allocation tag string, not a reference
+# to the GitHub repository, so it deliberately keeps its lower-case form even
+# though the repository is now VMware-Migration-EC2-ONTAP. Changing it would
+# split existing cost reports at the rename. tools/check_repo_names.py only
+# inspects github.com URLs in prose, so this is not a gap in that check.
+
 # ==============================================================================
 # Metadata
 # ==============================================================================

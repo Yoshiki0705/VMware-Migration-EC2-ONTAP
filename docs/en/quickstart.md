@@ -25,8 +25,8 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/Yoshiki0705/vmware-migration-ec2-ontap.git
-cd vmware-migration-ec2-ontap
+git clone https://github.com/Yoshiki0705/VMware-Migration-EC2-ONTAP.git
+cd VMware-Migration-EC2-ONTAP
 
 # Set up git hooks
 git config core.hooksPath .githooks

@@ -7,7 +7,7 @@
 
 > **前提の確認**: 本手順は設定入力までを扱う。実際のレプリケーション実行・カットオーバー・Finalize は含まない。
 >
-> 設定後の移行は 5 段階（継続レプリケーション → テスト → カットオーバー → ロールバック → Finalize）で進み、**不可逆点はカットオーバーではなく Finalize** である。テストは FlexClone を使うためレプリケーションを止めずに何度でも繰り返せる。この機構と制約の全体像は [ATX FSx for ONTAP GA 検証レポート](./atx-fsxn-ga-verification.md) の 8 章・9 章（特に 9.7）を参照。一次情報は [AWS Storage Blog](https://aws.amazon.com/jp/blogs/storage/migrate-vmware-storage-to-amazon-fsx-for-netapp-ontap-using-aws-transform/)。
+> 設定後の移行は 5 段階（継続レプリケーション → テスト → カットオーバー → ロールバック → Finalize）で進み、**不可逆点はカットオーバーではなく Finalize** である。テストは FlexClone を使うためレプリケーションを止めずに何度でも繰り返せる。**そして Finalize は後片付けではなく物理容量が最大になる工程で、スプリットに移行データ 1 本分の追加容量が一時的に必要**（12.10）。この機構と制約の全体像は [ATX FSx for ONTAP GA 検証レポート](./atx-fsxn-ga-verification.md) の 8 章・9 章（特に 9.7）を参照。一次情報は [AWS Storage Blog](https://aws.amazon.com/jp/blogs/storage/migrate-vmware-storage-to-amazon-fsx-for-netapp-ontap-using-aws-transform/)。
 
 ---
 

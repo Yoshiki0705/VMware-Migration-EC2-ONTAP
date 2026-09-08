@@ -7,7 +7,7 @@
 
 > **Scope**: this procedure covers configuration input only. It does not cover running replication, cutover, or Finalize.
 >
-> Migration after configuration proceeds in five stages (continuous replication, testing, cutover, rollback, Finalize), and **the irreversible point is Finalize, not cutover**. Testing uses FlexClone, so it can be repeated any number of times without stopping replication. For that mechanism and the full constraint picture, see sections 8 and 9 of the [ATX FSx for ONTAP GA verification report](./atx-fsxn-ga-verification.md), particularly 9.7. The primary source is the [AWS Storage Blog](https://aws.amazon.com/blogs/storage/migrate-vmware-storage-to-amazon-fsx-for-netapp-ontap-using-aws-transform/).
+> Migration after configuration proceeds in five stages (continuous replication, testing, cutover, rollback, Finalize), and **the irreversible point is Finalize, not cutover**. Testing uses FlexClone, so it can be repeated any number of times without stopping replication. **And Finalize is not cleanup — it is the step where physical capacity peaks, with the split temporarily needing one extra copy of the migrated data** (12.10). For that mechanism and the full constraint picture, see sections 8 and 9 of the [ATX FSx for ONTAP GA verification report](./atx-fsxn-ga-verification.md), particularly 9.7. The primary source is the [AWS Storage Blog](https://aws.amazon.com/blogs/storage/migrate-vmware-storage-to-amazon-fsx-for-netapp-ontap-using-aws-transform/).
 
 ---
 
