@@ -57,12 +57,32 @@ jobs:
       # matching fails the job instead of reporting an empty result as a pass.
       - name: Japanese heading style (noun phrases)
         run: make headings
+      # Same shape: the selftest runs first, so a rule that stopped matching
+      # fails the job rather than reporting an empty result as a pass.
+      - name: Role-name labels on notes and headings
+        run: make role-labels
 
-      # `make drift` also runs the global steering/skills validator, which lives
-      # in ~/.kiro and is not present on a runner. Only the repository-local half
-      # of drift detection runs here; the other half runs at SessionStart locally.
+      # The steps in this job must be exactly the prerequisites of `make gates`,
+      # and scripts/tests/test_ci_gate_parity.py fails the build when they are
+      # not. The three diagram gates below were missing for months: the Makefile
+      # said they were in `drift` so that "CI runs them always", but this file
+      # never invoked `drift` — it invoked `context-budget` alone. Nothing checked
+      # the claim, so the comment stayed true-looking and the gates never ran.
+      #
+      # `agent-config` stays out: it calls a validator under ~/.kiro, which does
+      # not exist on a runner. That is why `ci` is `gates` plus that one target
+      # rather than `gates` being the whole of `ci`.
       - name: Context budget (AGENTS.md size, loader thinness, index reachability)
         run: make context-budget
+
+      - name: Diagram artefact consistency
+        run: make diagram-assets
+
+      - name: Diagram label readability floor
+        run: make diagram-fonts
+
+      - name: Diagram reading direction
+        run: make diagram-flow
 
   shellcheck:
     name: Shell script lint

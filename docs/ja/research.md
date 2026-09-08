@@ -715,7 +715,7 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 | 5 | 移行所要時間 | 変換時間の実測（VMDK サイズ別） | Shift Toolkit ジョブログ |
 | 6 | ロールバック | ソース VM がそのまま起動可能 | vCenter |
 
-#### 3b. EC2/Nitro 固有検証（VMware Specialist 観点）
+#### 3b. EC2/Nitro 固有検証（ドライバ・メタデータ・時刻同期）
 
 | # | 検証項目 | 判定基準 | ツール | 備考 |
 |---|---------|---------|-------|------|
@@ -725,7 +725,7 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 | 10 | Windows ライセンス状態 | BYOL or License Included の判定、アクティベーション状態 | `slmgr /dli` | BYOL の場合 KMS or MAK 設定要確認 |
 | 11 | タイムゾーン/NTP | UTC 設定 + chrony/w32tm 正常同期 | `timedatectl`, `chronyc sources` | VMware Tools 時刻同期からの切り替え |
 
-#### 3c. FSx for ONTAP iSCSI ストレージ検証（Storage Specialist 観点）
+#### 3c. FSx for ONTAP iSCSI ストレージ検証（構成記録とベンチマーク）
 
 **FSx for ONTAP 検証構成の記録要件（全ベンチマークに対して必須）:**
 
