@@ -396,7 +396,7 @@ Prerequisites に挙げられているのは MGN の初期化状態、VPC 構成
 
 ### 7.2 稼働中バージョンの確認手段 [実測 / 2026-09-04]
 
-付随して判明した点として、**FSx の AWS API は ONTAP のソフトウェアバージョンを返さない**。`describe-file-systems` のレスポンスにバージョンを示すフィールドは存在しない（`FileSystemTypeVersion` は ONTAP では `None`、`OntapConfiguration` 配下にも該当フィールドなし）。
+付随して判明した点として、**FSx の AWS API は ONTAP のソフトウェアバージョンを返さない**。`describe-file-systems` のレスポンスにバージョンを示すフィールドは存在しない（`FileSystemTypeVersion` は ONTAP では `None`、`OntapConfiguration` 配下にも該当フィールドなし）。これは仕様として文書化されている: [`FileSystem`](https://docs.aws.amazon.com/fsx/latest/APIReference/API_FileSystem.html) の `FileSystemTypeVersion` は "The **Lustre version** of the Amazon FSx for Lustre file system, which can be `2.10`, `2.12`, or `2.15`" と定義されており、ONTAP のバージョンを運ぶ項目ではない。
 
 ```
 top-level keys      : AdministrativeActions, CreationTime, FileSystemId, FileSystemType,

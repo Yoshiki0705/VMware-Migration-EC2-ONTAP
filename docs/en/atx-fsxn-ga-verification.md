@@ -396,7 +396,7 @@ On real hardware, **the path held from replication through cutover on ONTAP 9.18
 
 ### 7.2 How to check the running version [Measured / 2026-09-04]
 
-A related finding: **the FSx AWS API does not return the ONTAP software version.** The `describe-file-systems` response contains no field indicating a version (`FileSystemTypeVersion` is `None` for ONTAP, and no corresponding field exists under `OntapConfiguration`).
+A related finding: **the FSx AWS API does not return the ONTAP software version.** The `describe-file-systems` response contains no field indicating a version (`FileSystemTypeVersion` is `None` for ONTAP, and no corresponding field exists under `OntapConfiguration`). That is documented behaviour: [`FileSystem`](https://docs.aws.amazon.com/fsx/latest/APIReference/API_FileSystem.html) defines `FileSystemTypeVersion` as "The **Lustre version** of the Amazon FSx for Lustre file system, which can be `2.10`, `2.12`, or `2.15`" — it is not a field that carries an ONTAP version.
 
 ```
 top-level keys      : AdministrativeActions, CreationTime, FileSystemId, FileSystemType,

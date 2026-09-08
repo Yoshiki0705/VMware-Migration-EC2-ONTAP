@@ -52,6 +52,8 @@ Ordered by impact. The first three **bear directly on data integrity or migratio
 
 **Impact**: in an environment with ongoing writes, the delta covered by the fallback is lost. **The job status does not expose this risk.** It is only visible by separately reading `describe-job-log-items`.
 
+**Why, structurally**: [`Job`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_Job.html) declares `status` with Valid Values `PENDING | STARTED | COMPLETED` — there is no failure value, and per-step outcomes do not surface at that level. Failure is carried by `launchStatus` on [`ParticipatingServer`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_ParticipatingServer.html) (`PENDING | IN_PROGRESS | LAUNCHED | FAILED | TERMINATED`), which covers launch only. **A snapshot fallback appears in neither field.** So `COMPLETED` is the documented response, and the request is precisely that there is nowhere for the risk to be expressed.
+
 **Request**: when the final snapshot fails and falls back, return a warning or a non-success status at job level. At minimum, add a field to the `describe-jobs` response indicating whether a fallback occurred.
 
 ### 3.2 F2: An inconsistent disk assignment is not detected
@@ -116,7 +118,7 @@ Separately, **the target instance's root EBS volume remains even after the insta
 
 **Current state**: the MGN User Guide Prerequisites and Known limitations, the MGN release notes, the ATX change log, and the AWS Storage Blog article were all checked, and **no minimum ONTAP version was found** (searched 2026-09-04).
 
-**A related gap**: the FSx for ONTAP AWS API does not return the ONTAP software version. `describe-file-systems` has no field carrying it (`FileSystemTypeVersion` is `None`), so checking requires reaching the ONTAP CLI or ONTAP REST API from inside the VPC.
+**A related gap**: the FSx for ONTAP AWS API does not return the ONTAP software version. `describe-file-systems` has no field carrying it, so checking requires reaching the ONTAP CLI or ONTAP REST API from inside the VPC. `FileSystemTypeVersion` being `None` is by design — [`FileSystem`](https://docs.aws.amazon.com/fsx/latest/APIReference/API_FileSystem.html) defines it as "The Lustre version of the Amazon FSx for Lustre file system". **The gap is that no alternative field exists.**
 
 **Request**:
 

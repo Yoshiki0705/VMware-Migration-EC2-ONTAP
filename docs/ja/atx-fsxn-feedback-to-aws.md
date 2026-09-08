@@ -52,6 +52,8 @@ Amazon FSx for NetApp ONTAP をターゲットストレージとする AWS Trans
 
 **影響**: 書き込みが継続している環境では、フォールバックした分の差分が失われる。**ジョブのステータスにはこのリスクが現れない。** `describe-job-log-items` を個別に確認しないと気づけない。
 
+**構造上の理由**: [`Job`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_Job.html) の `status` は Valid Values が `PENDING | STARTED | COMPLETED` の 3 値で、失敗を表す値を持たない。工程の成否は同じ階層に現れない。失敗を運ぶのは [`ParticipatingServer`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_ParticipatingServer.html) の `launchStatus`（`PENDING | IN_PROGRESS | LAUNCHED | FAILED | TERMINATED`）で、こちらは起動の成否のみを表す。**スナップショットのフォールバックはどちらのフィールドにも現れない。** したがって「ジョブが `COMPLETED`」は仕様どおりの応答であり、リスクを表現する場所が無いこと自体が要望の対象になる。
+
 **要望**: 最終スナップショットが失敗してフォールバックした場合、ジョブレベルで警告または非成功のステータスを返す。少なくとも `describe-jobs` のレスポンスにフォールバックの有無を示すフィールドを追加する。
 
 ### 3.2 F2: 検知されないディスク割り当ての不整合
@@ -116,7 +118,7 @@ Amazon FSx for NetApp ONTAP をターゲットストレージとする AWS Trans
 
 **現状**: MGN ユーザーガイドの Prerequisites と Known limitations、MGN リリースノート、ATX の Change log、AWS Storage Blog の解説記事を確認したが、**最小 ONTAP バージョンの記載が見つからない**（2026-09-04 調査）。
 
-**あわせての課題**: FSx for ONTAP の AWS API は ONTAP のソフトウェアバージョンを返さない。`describe-file-systems` にバージョンを示すフィールドが無く（`FileSystemTypeVersion` は `None`）、確認には VPC 内部から ONTAP CLI または ONTAP REST API に到達する必要がある。
+**あわせての課題**: FSx for ONTAP の AWS API は ONTAP のソフトウェアバージョンを返さない。`describe-file-systems` にバージョンを示すフィールドが無く、確認には VPC 内部から ONTAP CLI または ONTAP REST API に到達する必要がある。`FileSystemTypeVersion` が `None` になるのは仕様で、[`FileSystem`](https://docs.aws.amazon.com/fsx/latest/APIReference/API_FileSystem.html) は同項目を "The Lustre version of the Amazon FSx for Lustre file system" と定義している。**代替フィールドが無い**ことが課題である。
 
 **要望**:
 
