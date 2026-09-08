@@ -74,14 +74,67 @@ LABEL_PATTERNS = (
 # 列挙をそのまま写した状態である。**「揃える」ために裸の `AppSec` を外すと、規約が
 # 名指している形を通すようになる。selftest がその 3 例を固定しているので、外すと落ちる。
 #
-# 略語のうち単独で職種を指すもの（SA / CISO / CTO / CIO / DPO）は入れる。日本語は語間に
-# 空白がないので `\b` が使えず、ASCII 英字だけを境界にする。
+# **境界は両側に立てる。** 片側だけだと、トークンがより長い無関係な語の内側に一致する。
+# 実測した誤検出: `Engineering`（Engineer）、`Architecture` / `Architectural`（Architect）、
+# `エンジニアリング`（エンジニア）。一族で 4 件あり、1 件を直しても残りは残る。
+#
+# **境界クラスに数字と `_` を含める。** `[^A-Za-z]` は `\b` より緩く `_` を境界として扱う
+# ので、`FSx_SA_note` のような識別子の内側が語として読まれる。
+#
+# **複数形だけを許す（`s?`）。** `Engineers` は人、`Engineering` は分野。#144 の職種と
+# 分野の区分を語尾に適用した形である。`s?` が無いと、境界を立てた時点で
+# `（Engineers 観点）` を落とす。
+_BOUND_L = r"(?<![A-Za-z0-9_])"
+_BOUND_R = r"(?![A-Za-z0-9_])"
+
+# 語尾 -er / -ist / -ant / -or の職種名。複数形を許す。
+_TITLES = (
+    "Specialist",
+    "Engineer",
+    "Architect",
+    "Practitioner",
+    "Officer",
+    "Analyst",
+    "Consultant",
+    "Administrator",
+    "Developer",
+    "Manager",
+    "Reviewer",
+    "AppSec",
+    "SRE",
+    "Pre-Sales",
+    "Presales",
+)
+
+# 単独で職種を指す略語。複数形は取らない。
+_ABBREVIATIONS = ("SA", "CISO", "CTO", "CIO", "DPO")
+
+# 日本語は語間に空白がないので `\b` が使えない。`エンジニアリング` は分野なので除く。
+_JAPANESE = (
+    r"エンジニア(?!リング)",
+    r"アーキテクト",
+    r"スペシャリスト",
+    r"コンサルタント",
+    r"レビュアー",
+    r"担当者",
+    r"責任者",
+    r"専門家",
+)
+
 ROLE = re.compile(
-    r"(?:Specialist|Engineer|Architect|Practitioner|Officer|Analyst|Consultant"
-    r"|Administrator|Developer|Manager|Reviewer|AppSec|DevOps Engineer|SRE"
-    r"|Pre-Sales|Presales"
-    r"|(?<![A-Za-z])(?:SA|CISO|CTO|CIO|DPO)(?![A-Za-z])"
-    r"|エンジニア|アーキテクト|スペシャリスト|コンサルタント|レビュアー|担当者|責任者|専門家)"
+    _BOUND_L
+    + r"(?:"
+    + "|".join(_TITLES)
+    + r")s?"
+    + _BOUND_R
+    + r"|"
+    + _BOUND_L
+    + r"(?:"
+    + "|".join(_ABBREVIATIONS)
+    + r")"
+    + _BOUND_R
+    + r"|"
+    + r"|".join(_JAPANESE)
 )
 
 LENS = re.compile(r"(?:lens|Lens|レンズ|視点|観点|perspective|Perspective|目線)")
@@ -132,8 +185,17 @@ CASES: list[tuple[str, bool]] = [
     ("#### 3d. コスト検証（FinOps 観点）", False),
     ("#### 3e. 移行後運用検証（Reliability/Ops 観点）", False),
     ("> **Security note**: 権限を絞る", False),
-    # `SA` は ASCII 英字に挟まれていれば別語の一部であって職種ではない。
+    # --- 境界の一族。トークンがより長い無関係な語の内側にある形（実測した誤検出）---
     ("## USA 市場の観点", False),
+    ("## 設計（Engineering 観点）", False),
+    ("## Architecture の観点", False),
+    ("## Architectural 判断の観点", False),
+    ("## エンジニアリングの観点", False),
+    ("## FSx_SA_note の観点", False),
+    # 複数形は人を指すので落とす。`s?` を外すとここが通る。
+    ("## 前提（Engineers 観点）", True),
+    # 空白の無い日本語でも境界が立つ（`\b` では立たない）。
+    ("## 前提（SA観点）", True),
     # --- 散文はラベルではない ---
     ("Storage Specialist の観点から書かれた記事を読んだ。", False),
     # --- フェンスの中は例示であって published なラベルではない ---

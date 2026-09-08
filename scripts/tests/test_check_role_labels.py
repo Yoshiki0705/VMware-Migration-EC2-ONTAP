@@ -13,6 +13,7 @@ form and stay quiet on the prose form.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -69,6 +70,78 @@ def test_role_label_is_rejected(text: str) -> None:
 )
 def test_acceptable_label_is_not_rejected(text: str) -> None:
     assert not labels.violations(text), f"should not have been flagged: {text!r}"
+
+
+# ---------------------------------------------------------------- boundaries
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A token inside a longer, unrelated word. Measured false positives before
+        # the boundaries were made two-sided: four of them, one family.
+        pytest.param("## 設計（Engineering 観点）", id="engineer-in-engineering"),
+        pytest.param("## Architecture の観点", id="architect-in-architecture"),
+        pytest.param("## Architectural 判断の観点", id="architect-in-architectural"),
+        pytest.param("## エンジニアリングの観点", id="ja-engineer-in-engineering"),
+        pytest.param("## USA 市場の観点", id="sa-in-usa"),
+        # `[^A-Za-z]` treats `_` as a boundary, which is looser than `\b` and reads
+        # an identifier as prose. The class excludes digits and `_` for that reason.
+        pytest.param("## FSx_SA_note の観点", id="abbreviation-inside-identifier"),
+    ],
+)
+def test_token_inside_a_longer_word_is_not_a_role(text: str) -> None:
+    assert not labels.violations(text), f"false positive: {text!r}"
+
+
+def test_plural_is_a_person_and_gerund_is_a_field() -> None:
+    """`Engineers` are people; `Engineering` is a field. Only `s?` is allowed."""
+    assert labels.violations("## 前提（Engineers 観点）")
+    assert not labels.violations("## 設計（Engineering 観点）")
+
+
+def test_boundary_holds_without_whitespace() -> None:
+    """Japanese has no word spaces, so `\\b` never fires next to a CJK character."""
+    assert labels.violations("## 前提（SA観点）")
+    assert labels.violations("> **SREレンズ**: x")
+
+
+# ---------------------------------------------------------------- mutation
+
+
+def _mutate(pattern_source: str) -> re.Pattern[str]:
+    return re.compile(pattern_source)
+
+
+def test_one_sided_boundary_would_reintroduce_false_positives() -> None:
+    """Each guard must be load-bearing, not decorative.
+
+    Dropping the left lookbehind reintroduces the `USA` family; dropping the
+    right lookahead reintroduces the `Engineering` family. Asserting that the
+    current pattern passes says nothing about which part of it is doing the work.
+    """
+    titles = "|".join(labels._TITLES)
+    abbrev = "|".join(labels._ABBREVIATIONS)
+
+    right_only = _mutate(rf"(?:{titles})s?{labels._BOUND_R}|(?:{abbrev}){labels._BOUND_R}")
+    assert right_only.search("USA 市場"), "left boundary is not load-bearing"
+
+    left_only = _mutate(rf"{labels._BOUND_L}(?:{titles})s?|{labels._BOUND_L}(?:{abbrev})")
+    assert left_only.search("Engineering"), "right boundary is not load-bearing"
+
+    no_plural = _mutate(rf"{labels._BOUND_L}(?:{titles}){labels._BOUND_R}")
+    assert not no_plural.search("Engineers"), "`s?` is not load-bearing"
+
+
+def test_the_standards_named_examples_stay_covered() -> None:
+    """The output standard names these three labels. Tidying the token list
+    toward a clean semantic line would drop the first one."""
+    for named in (
+        "> **AppSec lens**: x",
+        "> **FinOps Engineer lens**: x",
+        "> **Chaos Engineering Practitioner lens**: x",
+    ):
+        assert labels.violations(named), f"the standard names this: {named!r}"
 
 
 # ---------------------------------------------------------------- gate wiring
