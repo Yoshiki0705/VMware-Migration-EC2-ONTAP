@@ -53,7 +53,7 @@ MGN が未初期化の場合、`設定 → レプリケーションテンプレ�
 
 画面の説明文は「続行することで、データレプリケーションと移行済みサーバーの起動に必要なすべての IAM ロールを AWS Transform MGN が作成することを許可することになります」。`サービスをセットアップ` を押す。
 
-> **CLI では失敗する場合がある**: `aws mgn initialize-service` が `ValidationException: Failed to create SLR or instance profiles`（`reason: OTHER`）で再現性を持って失敗する環境を確認している。この場合でもコンソールからの初期化は成功する。CLI 失敗時はサービスリンクロールと**ロール未紐付けの空のインスタンスプロファイル 4 件**が残るため、コンソールで初期化する前に空のプロファイルを削除しておくと状態が読みやすい。詳細は [検証レポート 5.4](./atx-fsxn-ga-verification.md)。
+> **CLI / API 経路には前提条件がある**: `aws mgn initialize-service` は IAM ロールを作らない。8 件のロールを先に作成して管理ポリシーをアタッチしてから実行する手順であり（[API での初期化](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html) の手順 1）、これを踏まずに実行すると `ValidationException: Failed to create SLR or instance profiles`（`reason: OTHER`）で失敗する。失敗時はサービスリンクロールと**ロール未紐付けのインスタンスプロファイル 4 件**が残るため、やり直す前に削除しておくと状態が読みやすい。コンソール経路はロール作成まで代行するため、前提条件なしで成功する。詳細は [検証レポート 5.4](./atx-fsxn-ga-verification.md)。
 
 初期化が完了すると「デフォルトのテンプレートが作成されました」が表示される。
 

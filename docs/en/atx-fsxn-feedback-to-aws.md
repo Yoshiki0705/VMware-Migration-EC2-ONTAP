@@ -34,7 +34,7 @@ Ordered by impact. The first three **bear directly on data integrity or migratio
 | F1 | Defect-class | The job returns `COMPLETED` / `LAUNCHED` even when the final snapshot failed | A lost delta goes unnoticed |
 | F2 | Defect-class | The job reports success for an unbootable target caused by an inconsistent disk assignment | Finalizing without noticing removes the recovery path |
 | F3 | Missing capability | No way to repair an inconsistent disk assignment | Deleting and re-onboarding the source server is the only workaround |
-| F4 | Defect | `initialize-service` (CLI) fails reproducibly while the console succeeds | Initialization cannot be done from CLI or IaC |
+| F4 | Documentation | The API initialization page opens as though roles are created for you, then asks you to create them in step 1 | The prerequisite is missed on the API / IaC path |
 | D1 | Documentation | No statement of the resources `SETUP_FSX_PROXY` creates in the customer VPC, or their cost | Migration cost estimates do not match reality |
 | D2 | Documentation | No statement that Finalize leaves the NLB and VPC endpoint service behind | Billing continues after the migration completes |
 | D3 | Documentation | No statement of the physical capacity Finalize temporarily requires | Room for failure from insufficient free space |
@@ -51,6 +51,8 @@ Ordered by impact. The first three **bear directly on data integrity or migratio
 **Reproduction**: start a cutover while the replication agent is unresponsive. Here that was induced by stopping the source OS. The snapshot timed out after 300 seconds.
 
 **Impact**: in an environment with ongoing writes, the delta covered by the fallback is lost. **The job status does not expose this risk.** It is only visible by separately reading `describe-job-log-items`.
+
+**Why, structurally**: [`Job`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_Job.html) declares `status` with Valid Values `PENDING | STARTED | COMPLETED` — there is no failure value, and per-step outcomes do not surface at that level. Failure is carried by `launchStatus` on [`ParticipatingServer`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_ParticipatingServer.html) (`PENDING | IN_PROGRESS | LAUNCHED | FAILED | TERMINATED`), which covers launch only. **A snapshot fallback appears in neither field.** So `COMPLETED` is the documented response, and the request is precisely that there is nowhere for the risk to be expressed.
 
 **Request**: when the final snapshot fails and falls back, return a warning or a non-success status at job level. At minimum, add a field to the `describe-jobs` response indicating whether a fallback occurred.
 
@@ -76,17 +78,17 @@ Ordered by impact. The first three **bear directly on data integrity or migratio
 
 **Request**: provide an API that re-evaluates the assignment, or an operation that syncs the stored configuration to the actual layout. If that is not feasible by design, **state in the documentation that re-onboarding is the only route**.
 
-### 3.4 F4: Reproducible failure of `initialize-service` (CLI)
+### 3.4 F4: The API initialization page reads as though it cancels its own prerequisite
 
-**Observed**: `aws mgn initialize-service` fails with `ValidationException: Failed to create SLR or instance profiles` (reason `OTHER`). It creates the service-linked role and **four empty instance profiles with no roles attached**, and creates zero roles. Deleting the empty profiles and retrying reproduces the identical state.
+> **Corrected 2026-09-08**: this was originally filed as a defect — reproducible CLI initialization failure. **It is not a defect.** The API path expects the customer to create 8 IAM roles first, and we had not. Withdrawn as a defect; it stays as a documentation inconsistency.
 
-**Ruled out**: caller permissions (AdministratorAccess), SCPs (the account is the Organizations management account), IAM quotas, and name collisions. No IAM events appear in the CloudTrail event history in either ap-northeast-1 or us-east-1.
+**Observed**: [Initializing AWS Transform MGN with the API](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html) opens by describing initialization as "The required IAM roles and policies will be created." Step 1 on the same page is "Create the required IAM roles", asking the customer to create 8 roles with `CreateRole` and attach their managed policies. Reading only the first sentence, `initialize-service` appears to create the roles too.
 
-**Control**: **initialization from the management console succeeds in the same account and the same region.** Nine roles are created, including the two FSx-specific ones.
+**Actual behaviour** (our own CloudTrail, us-east-1, 2026-09-03 20:31 UTC): `initialize-service` never calls `CreateRole`. It calls `CreateServiceLinkedRole` → `CreateInstanceProfile` × 4 → `AddRoleToInstanceProfile` × 4, and those last four fail with `NoSuchEntityException` (`The role with name AWSApplicationMigration...Role cannot be found.`). That matches the later text on the same page.
 
-**Impact**: initialization cannot be expressed in code, since the CLI path does not work.
+**Impact**: running it without meeting the prerequisite fails with `ValidationException: Failed to create SLR or instance profiles` (reason `OTHER`). The error does not name the missing role, so anyone working from the opening sentence misdiagnoses it as a service defect. **We did.**
 
-**Request**: fix the CLI path. Also make the failure triageable by the customer (which role creation failed, and a CloudTrail record of the attempt).
+**Request**: 1. Make the opening sentence clearly belong to the console path, since step 1 of the API path is the customer's work. 2. Include the missing role name in the `ValidationException` message.
 
 ## 4. Documentation gaps
 
@@ -116,7 +118,7 @@ Separately, **the target instance's root EBS volume remains even after the insta
 
 **Current state**: the MGN User Guide Prerequisites and Known limitations, the MGN release notes, the ATX change log, and the AWS Storage Blog article were all checked, and **no minimum ONTAP version was found** (searched 2026-09-04).
 
-**A related gap**: the FSx for ONTAP AWS API does not return the ONTAP software version. `describe-file-systems` has no field carrying it (`FileSystemTypeVersion` is `None`), so checking requires reaching the ONTAP CLI or ONTAP REST API from inside the VPC.
+**A related gap**: the FSx for ONTAP AWS API does not return the ONTAP software version. `describe-file-systems` has no field carrying it, so checking requires reaching the ONTAP CLI or ONTAP REST API from inside the VPC. `FileSystemTypeVersion` being `None` is by design — [`FileSystem`](https://docs.aws.amazon.com/fsx/latest/APIReference/API_FileSystem.html) defines it as "The Lustre version of the Amazon FSx for Lustre file system". **The gap is that no alternative field exists.**
 
 **Request**:
 

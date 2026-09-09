@@ -34,7 +34,7 @@ Amazon FSx for NetApp ONTAP をターゲットストレージとする AWS Trans
 | F1 | 不具合相当 | 最終スナップショットが失敗しても、ジョブは `COMPLETED` / `LAUNCHED` を返す | 差分が失われたことに気づけない |
 | F2 | 不具合相当 | ディスク割り当てが不整合でも、起動不能なターゲットに対してジョブは成功を返す | 移行失敗に気づかないまま Finalize すると復旧手段を失う |
 | F3 | 機能不足 | 不整合になったディスク割り当てを修復する手段が無い | ソースサーバーの削除・再登録が唯一の回避策 |
-| F4 | 不具合 | `initialize-service`（CLI）が再現性をもって失敗する。コンソールでは成功する | CLI / IaC による初期化が成立しない |
+| F4 | ドキュメント | API 経路の初期化ページが、冒頭でロール作成を代行すると読めるのに手順 1 で利用者に作成を求めている | API / IaC 経路で前提条件を踏み損ねる |
 | D1 | ドキュメント | `SETUP_FSX_PROXY` が利用者 VPC に作成するリソースと、その課金の記載が無い | 移行コストの見積りが実態と合わない |
 | D2 | ドキュメント | Finalize が NLB と VPC エンドポイントサービスを残すことの記載が無い | 移行完了後に課金が続く |
 | D3 | ドキュメント | Finalize が一時的に要求する物理容量の記載が無い | 空き容量不足で失敗する余地がある |
@@ -51,6 +51,8 @@ Amazon FSx for NetApp ONTAP をターゲットストレージとする AWS Trans
 **再現条件**: レプリケーションエージェントが応答しない状態でカットオーバーを開始する。本検証ではソース OS を停止して発生させた。スナップショットは 300 秒でタイムアウトした。
 
 **影響**: 書き込みが継続している環境では、フォールバックした分の差分が失われる。**ジョブのステータスにはこのリスクが現れない。** `describe-job-log-items` を個別に確認しないと気づけない。
+
+**構造上の理由**: [`Job`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_Job.html) の `status` は Valid Values が `PENDING | STARTED | COMPLETED` の 3 値で、失敗を表す値を持たない。工程の成否は同じ階層に現れない。失敗を運ぶのは [`ParticipatingServer`](https://docs.aws.amazon.com/mgn/latest/APIReference/API_ParticipatingServer.html) の `launchStatus`（`PENDING | IN_PROGRESS | LAUNCHED | FAILED | TERMINATED`）で、こちらは起動の成否のみを表す。**スナップショットのフォールバックはどちらのフィールドにも現れない。** したがって「ジョブが `COMPLETED`」は仕様どおりの応答であり、リスクを表現する場所が無いこと自体が要望の対象になる。
 
 **要望**: 最終スナップショットが失敗してフォールバックした場合、ジョブレベルで警告または非成功のステータスを返す。少なくとも `describe-jobs` のレスポンスにフォールバックの有無を示すフィールドを追加する。
 
@@ -76,17 +78,17 @@ Amazon FSx for NetApp ONTAP をターゲットストレージとする AWS Trans
 
 **要望**: 割り当てを再評価させる API、または既存の設定を実機のレイアウトに同期させる操作を用意する。それが設計上不可能であれば、**再登録が唯一の手段であることをドキュメントに明記する**。
 
-### 3.4 F4: `initialize-service`（CLI）の再現性のある失敗
+### 3.4 F4: API 初期化ページにある前提条件を打ち消す記述
 
-**事象**: `aws mgn initialize-service` が `ValidationException: Failed to create SLR or instance profiles`（reason `OTHER`）で失敗する。サービスリンクロールと**ロールが紐づかない空のインスタンスプロファイル 4 件**が作られ、ロールは 0 件作成される。空のプロファイルを削除して再試行すると同一の状態を再現する。
+> **訂正 2026-09-08**: 当初これは「CLI の初期化が再現性をもって失敗する不具合」として提出していた。**不具合ではない。** API 経路は 8 件の IAM ロールを利用者が先に作る手順であり、それを踏んでいなかった。不具合報告としては取り下げ、ドキュメントの不整合として残す。
 
-**除外した要因**: 呼び出し元の権限（AdministratorAccess）、SCP（当該アカウントは Organizations 管理アカウント）、IAM クォータ、名前衝突。CloudTrail の event history には ap-northeast-1 と us-east-1 のいずれにも IAM イベントが現れない。
+**事象**: [Initializing AWS Transform MGN with the API](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html) は冒頭で初期化の説明として "The required IAM roles and policies will be created." と書いている。同ページの手順 1 は "Create the required IAM roles." であり、8 件のロールを利用者が `CreateRole` で作成して管理ポリシーをアタッチすることを求めている。前者だけを読むと、`initialize-service` がロールまで作ると理解できる。
 
-**対照**: **同じアカウント・同じリージョンで、マネジメントコンソールからの初期化は成功する。** FSx 用の 2 つのロールを含む 9 ロールが作成される。
+**実際の挙動**（自環境の CloudTrail、us-east-1、2026-09-03 20:31 UTC）: `initialize-service` は `CreateRole` を 1 度も呼ばない。`CreateServiceLinkedRole` → `CreateInstanceProfile` × 4 → `AddRoleToInstanceProfile` × 4 の順で呼び、後者 4 件が `NoSuchEntityException`（`The role with name AWSApplicationMigration...Role cannot be found.`）で失敗する。同ページ後半の記述と一致している。
 
-**影響**: CLI / IaC による初期化が成立しないため、初期化をコード化できない。
+**影響**: 前提条件を踏まずに実行すると `ValidationException: Failed to create SLR or instance profiles`（reason `OTHER`）で失敗する。エラーはどのロールが無いのかを示さないため、ページ冒頭の記述を前提にしていると、サービス側の不具合と誤診する。**実際に誤診した。**
 
-**要望**: CLI 経路の失敗を修正する。あわせて、失敗時のエラーを利用者が切り分けられる内容にする（どのロールの作成で失敗したか、CloudTrail に記録が残るようにする）。
+**要望**: 1. 冒頭の "The required IAM roles and policies will be created." を、コンソール経路の説明であることが分かる形にする（API 経路は手順 1 が利用者側の作業である）。2. `ValidationException` のメッセージに、不足しているロール名を含める。
 
 ## 4. ドキュメント記載の不足
 
@@ -116,7 +118,7 @@ Amazon FSx for NetApp ONTAP をターゲットストレージとする AWS Trans
 
 **現状**: MGN ユーザーガイドの Prerequisites と Known limitations、MGN リリースノート、ATX の Change log、AWS Storage Blog の解説記事を確認したが、**最小 ONTAP バージョンの記載が見つからない**（2026-09-04 調査）。
 
-**あわせての課題**: FSx for ONTAP の AWS API は ONTAP のソフトウェアバージョンを返さない。`describe-file-systems` にバージョンを示すフィールドが無く（`FileSystemTypeVersion` は `None`）、確認には VPC 内部から ONTAP CLI または ONTAP REST API に到達する必要がある。
+**あわせての課題**: FSx for ONTAP の AWS API は ONTAP のソフトウェアバージョンを返さない。`describe-file-systems` にバージョンを示すフィールドが無く、確認には VPC 内部から ONTAP CLI または ONTAP REST API に到達する必要がある。`FileSystemTypeVersion` が `None` になるのは仕様で、[`FileSystem`](https://docs.aws.amazon.com/fsx/latest/APIReference/API_FileSystem.html) は同項目を "The Lustre version of the Amazon FSx for Lustre file system" と定義している。**代替フィールドが無い**ことが課題である。
 
 **要望**:
 

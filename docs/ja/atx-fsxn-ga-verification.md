@@ -189,7 +189,7 @@ IaC / CLI で設定する場合、**シークレット ARN の実在と内容は
 
 | 対象 | 状態 |
 |---|---|
-| MGN | 未初期化。`initialize-service` は失敗する（5.4） |
+| MGN | 未初期化。IAM ロール未作成のため `initialize-service` は失敗する（5.4） |
 | FSx for ONTAP ファイルシステム | 2 台、いずれも `AVAILABLE`。別々の VPC に所在 |
 | ファイルシステム構成 | ともに `SINGLE_AZ_1` / 1024 GiB / 128 MBps |
 | SVM | 9 台、いずれも `CREATED`。うち 3 台は AD 参加済み |
@@ -245,7 +245,9 @@ MGN コンソール → Settings → Replication template → Edit
 
 **レプリケーション（6 以降）の影響範囲**: 移行実行には自動バックアップと ARP の無効化が必要で（8.3）、いずれも**ファイルシステム単位の設定**である。候補ファイルシステムには他ワークストリームの 25 ボリュームが同居しているため、無効化はそれらのデータ保護にも及ぶ。加えて容量指針は「移行データ量の 3 倍、SSD 使用率 80% 以下」であり、1024 GiB のファイルシステムに約 1,166 GiB がシンプロビジョニングで確保済みの現状では、実使用量の確認が前提になる。
 
-### 5.4 initialize-service の失敗 [実測 / 2026-09-04]
+### 5.4 initialize-service に必要な前提条件 [実測 / 2026-09-04、訂正 2026-09-08]
+
+> **訂正**: 当初この節は「CLI の初期化が再現性をもって失敗する不具合」として記録していた。**不具合ではなく、こちらの手順の誤りである。** API 経路は 8 件の IAM ロールを**利用者が先に作る**手順になっており、[Initializing AWS Transform MGN with the API](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html) の手順 1 がそれである。`initialize-service` が行うのはサービスリンクロールの作成・インスタンスプロファイルの作成・**既存**ロールの紐付けであり、ロール自体は作らない。以下は当初の観測をそのまま残し、末尾で訂正の根拠を示す。
 
 MGN の初期化は再現性を持って失敗する。
 
@@ -274,7 +276,7 @@ Additional error details:
 | SCP による拒否 | 当該アカウントは Organizations の管理アカウントであり、SCP は管理アカウントに適用されない |
 | IAM クォータ超過 | ロール 452 / 1000、インスタンスプロファイル 40 / 1000 |
 | 既存リソースとの名前衝突 | 同名のロールは存在しない |
-| CloudTrail 上の IAM エラー | 当該時刻の IAM イベントは ap-northeast-1 / us-east-1 のいずれのイベント履歴にも現れず、内部で失敗している |
+| CloudTrail 上の IAM エラー | ~~当該時刻の IAM イベントはいずれのリージョンにも現れない~~ → **この確認が誤り。** us-east-1 に記録されている（下記の訂正を参照）。当時の照会は時刻範囲を取り違えていた可能性が高い。CloudTrail の出力はローカル時刻で表示される一方、`--start-time` / `--end-time` は UTC で解釈される |
 
 エージェント型レプリケーションはこれらのインスタンスプロファイルとロールを必要とするため、**この失敗が解消しない限り E2E 検証には進めない**。テンプレート設定（4.4）は初期化を必要としないため実測できた。
 
@@ -289,7 +291,30 @@ Additional error details:
 
 この 2 ロールの存在は、FSx for ONTAP 対応が初期化時点でロール構成に反映されることを示す。初期化を FSx for ONTAP 対応前に済ませた環境では、テンプレート画面の `サービスのアクセス許可を再初期化` が必要になる理由がこれで説明できる。
 
-**含意**: CLI の `initialize-service` の失敗を「アカウント側の問題」と解釈すると誤る。コンソールとの差であり、CLI 失敗時はコンソールで初期化すれば進める。CLI が生成した空のインスタンスプロファイル 4 件は、コンソール初期化の前に削除した。
+#### 訂正の根拠 [実測 / 2026-09-08]
+
+CloudTrail（us-east-1、IAM はグローバルサービスのためここに記録される）で失敗時の呼び出し列を確認した。
+
+| 経路 | `CreateRole` の呼び出し回数 | 観測された列 |
+|---|---|---|
+| CLI（2026-09-03 20:31 UTC、失敗） | **0 回** | `CreateServiceLinkedRole` → `CreateInstanceProfile` × 4 → `AddRoleToInstanceProfile` × 4 が全て `NoSuchEntityException`（`The role with name AWSApplicationMigration...Role cannot be found.`） |
+| コンソール（2026-09-04 06:13 UTC、成功） | **8 回** | ロールを作成したうえでプロファイルへ紐付け |
+
+`initialize-service` はロールを作ろうとしていない。存在しないロールをプロファイルへ紐付けようとして失敗している。これは [API での初期化手順](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html) の記述と一致する。
+
+> Once the policies are attached to the roles, run the `aws mgn initialize-service` command. This will automatically create the service-linked role, create instance profiles, and add Roles to Instance Profiles.
+
+**正しい手順**（API / IaC 経路）:
+
+1. 8 件のロールを `CreateRole` で作成し、指定の管理ポリシーをアタッチする（同ページの表）。FSx for ONTAP をターゲットにする場合、`AWSApplicationMigrationFsxProxyRole` と `AWSApplicationMigrationFsxProxyLinkRole` もこの 8 件に含まれる
+2. `aws mgn initialize-service`
+3. `aws mgn create-replication-configuration-template` と `aws mgn create-launch-configuration-template`
+
+**再検証**: ロールが揃った状態で `aws mgn initialize-service --region ap-northeast-1` は成功する（exit 0、2026-09-08 実測）。ただし**この再実行にはコントロールが無い**。失敗条件を再現するにはロールを削除する必要があり、稼働中の検証環境を壊すため実施していない。根拠は上記の CloudTrail の記録であって、再実行の成功ではない。
+
+**含意**: この失敗を「CLI の不具合」や「アカウント側の問題」と解釈すると誤る。**API 経路の前提条件が公開ドキュメントに記載されており、それを踏んでいなかった。** コンソール経路が成功したのは、コンソールがロール作成まで代行するためである。
+
+> **ドキュメントに残る不整合**: 同ページ冒頭は初期化の説明として "The required IAM roles and policies will be created." と書いており、手順 1 で利用者にロール作成を求める記述と読み合わせると、API 経路では誤読を招く。ここは F4 として残す。
 
 ---
 
@@ -371,7 +396,7 @@ Prerequisites に挙げられているのは MGN の初期化状態、VPC 構成
 
 ### 7.2 稼働中バージョンの確認手段 [実測 / 2026-09-04]
 
-付随して判明した点として、**FSx の AWS API は ONTAP のソフトウェアバージョンを返さない**。`describe-file-systems` のレスポンスにバージョンを示すフィールドは存在しない（`FileSystemTypeVersion` は ONTAP では `None`、`OntapConfiguration` 配下にも該当フィールドなし）。
+付随して判明した点として、**FSx の AWS API は ONTAP のソフトウェアバージョンを返さない**。`describe-file-systems` のレスポンスにバージョンを示すフィールドは存在しない（`FileSystemTypeVersion` は ONTAP では `None`、`OntapConfiguration` 配下にも該当フィールドなし）。これは仕様として文書化されている: [`FileSystem`](https://docs.aws.amazon.com/fsx/latest/APIReference/API_FileSystem.html) の `FileSystemTypeVersion` は "The **Lustre version** of the Amazon FSx for Lustre file system, which can be `2.10`, `2.12`, or `2.15`" と定義されており、ONTAP のバージョンを運ぶ項目ではない。
 
 ```
 top-level keys      : AdministrativeActions, CreationTime, FileSystemId, FileSystemType,
@@ -564,7 +589,7 @@ Playbook の evidence tier と本レポートのタグの対応は 2 章に記�
 | U6 | 最小 ONTAP バージョン要件 | 未確認 | 公開ドキュメントに記載が見つからない（2026-09-04 調査） |
 | U7 | EVS + FSx for ONTAP の GA 状態 | 未確認 | GA 告知が見つからない（2026-09-04 調査） |
 | U8 | `SETUP_FSX_PROXY` と PrivateLink 自動確立の対応関係 | **解消**（12.2） | NLB + VPC エンドポイントサービスの作成を実測。許可プリンシパルは `mgn.amazonaws.com` |
-| U9 | `initialize-service`（CLI）失敗の根本原因 | 未確認 | 内部エラー。CloudTrail に IAM エラーが現れない。**コンソール経路では成功するため E2E のブロッカーではなくなった**（5.4） |
+| U9 | `initialize-service`（CLI）失敗の根本原因 | **解決** | 不具合ではない。API 経路は 8 件の IAM ロールを先に作る手順であり、それを踏んでいなかった。CloudTrail（us-east-1）に `AddRoleToInstanceProfile` の `NoSuchEntityException` が記録されている（5.4） |
 | U10 | コンソールからの MGN 初期化の成否 | **解消**（5.4） | 成功。FSx 専用ロール 2 件を含む 9 ロールが作成された |
 | U11 | 候補ファイルシステムの実 SSD 使用量 | **解消**（5.6） | アグリゲート 861.8 GiB / 使用 50.0 GiB / 利用率 5.8% |
 | U12 | テンプレートの保存完了（FSx for ONTAP 設定の確定） | **解消**（4.6） | 証明書認証を否定対照つきで確認し、保存を API 読み戻しで確認 |
