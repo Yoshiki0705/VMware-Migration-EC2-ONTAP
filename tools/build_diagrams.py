@@ -103,6 +103,16 @@ ICONS = {
     ),
     "fargate": "Architecture-Service-Icons_{d}/Arch_Containers/64/Arch_AWS-Fargate_64.svg",
     "lambda": "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Lambda_64.svg",
+    "batch": "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Batch_64.svg",
+    "pcs": (
+        "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Parallel-Computing-Service_64.svg"
+    ),
+    # リソースアイコン（48px）。アクセスポイントはサービスではなく、ファイルシステムの前に
+    # 置く入口なので、サービスアイコンではなくこちらを使う。Light / Dark の別ファイルは無い。
+    "s3_ap": (
+        "Resource-Icons_{d}/Res_Storage/"
+        "Res_Amazon-Simple-Storage-Service_General-Access-Points_48.svg"
+    ),
     "s3": (
         "Architecture-Service-Icons_{d}/Arch_Storage/64/Arch_Amazon-Simple-Storage-Service_64.svg"
     ),
@@ -135,8 +145,11 @@ ICON_SIZE = {
     "rosa": 80,
     "fargate": 80,
     "lambda": 80,
+    "batch": 80,
+    "pcs": 80,
     "s3": 80,
     "dynamodb": 80,
+    "s3_ap": 48,
     "privatelink": 80,
     "secrets_manager": 80,
     "nlb": 48,
@@ -392,9 +405,12 @@ LABELS: dict[str, dict[str, str]] = {
     "phase2": {"ja": "Phase 2: リプラットフォーム", "en": "Phase 2: replatform"},
     "phase3": {"ja": "Phase 3: リファクタ", "en": "Phase 3: refactor"},
     "p1_ec2": {"ja": "Amazon EC2", "en": "Amazon EC2"},
+    # **本検証で測ったのは iSCSI だけ。** NFS と SMB は同じファイルシステムが同時に提供できる
+    # プロトコルで、段の中に並べるのは移行後に選べる入口を示すため。検証済みかどうかの区別は
+    # 枠のタイトルと本文が持つ。
     "p1_fsx": {
-        "ja": "Amazon FSx for NetApp ONTAP\n（iSCSI LUN）",
-        "en": "Amazon FSx for NetApp ONTAP\n(iSCSI LUN)",
+        "ja": "Amazon FSx for NetApp ONTAP\n（iSCSI LUN / NFS / SMB）",
+        "en": "Amazon FSx for NetApp ONTAP\n(iSCSI LUN / NFS / SMB)",
     },
     "p2_ecs": {
         "ja": "Amazon Elastic\nContainer Service",
@@ -404,9 +420,14 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Amazon Elastic\nKubernetes Service",
         "en": "Amazon Elastic\nKubernetes Service",
     },
+    "p2_batch": {"ja": "AWS Batch", "en": "AWS Batch"},
+    "p2_pcs": {
+        "ja": "AWS Parallel\nComputing Service",
+        "en": "AWS Parallel\nComputing Service",
+    },
     "p2_fsx": {
-        "ja": "Amazon FSx for NetApp ONTAP\n（NFS / iSCSI）",
-        "en": "Amazon FSx for NetApp ONTAP\n(NFS / iSCSI)",
+        "ja": "Amazon FSx for NetApp ONTAP\n（NFS / SMB / iSCSI）",
+        "en": "Amazon FSx for NetApp ONTAP\n(NFS / SMB / iSCSI)",
     },
     "p3_fargate": {"ja": "AWS Fargate", "en": "AWS Fargate"},
     "p3_lambda": {"ja": "AWS Lambda", "en": "AWS Lambda"},
@@ -415,6 +436,13 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "Amazon Simple\nStorage Service",
     },
     "p3_dynamodb": {"ja": "Amazon DynamoDB", "en": "Amazon DynamoDB"},
+    "p3_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    # 命名規約どおり「FSx for ONTAP S3 AP」。**bare な「S3 AP」は使わない。** Amazon S3 の
+    # アクセスポイントと同じ名前で別のものなので、どちらの入口かが名前に要る。
+    "p3_s3ap": {"ja": "FSx for ONTAP S3 AP", "en": "FSx for ONTAP S3 AP"},
     # --- figure 1 -------------------------------------------------------------------
     "aws_cloud": {"ja": "AWS クラウド（ap-northeast-1）", "en": "AWS Cloud (ap-northeast-1)"},
     "vpc": {"ja": "利用者の Amazon VPC", "en": "Customer Amazon VPC"},
@@ -1098,10 +1126,10 @@ def _migration_journey() -> Diagram:
         name="atx-fsxn-migration-journey",
         diagram_id="atx-fsxn-migration-journey",
         width=940,
-        # 1090。最下段のラベルが 1024 まで伸びる。**段の高さは 210 で揃える。** 140 に縮めた
-        # ときは枠のタイトルの上にアイコンが重なった（アイコンの中心が枠の上端 + 90 なので、
-        # 高さを削るとタイトルの帯に食い込む）。
-        height=1090,
+        # 1370。**段の高さは中身の行数で決まる。** Phase 2 と Phase 3 は 2 行なので 350、
+        # Phase 1 は 1 行なので 210。以前 140 に縮めた段では枠のタイトルの上にアイコンが
+        # 重なった（アイコンの中心が枠の上端 + 90 なので、高さを削るとタイトルの帯に食い込む）。
+        height=1370,
         # すべて破線。**実線の枠は AWS の構成（VPC など）に見える。** ここでの枠は段と選択肢
         # という論理的なまとまりで、AWS のリソース境界ではない。
         groups=(
@@ -1117,8 +1145,11 @@ def _migration_journey() -> Diagram:
                 dashed=True,
             ),
             Group("phase1", "phase1", 30, 350, 885, 210, gr_icon=None, kind="vpc", dashed=True),
-            Group("phase2", "phase2", 30, 600, 885, 210, gr_icon=None, kind="vpc", dashed=True),
-            Group("phase3", "phase3", 30, 850, 885, 210, gr_icon=None, kind="vpc", dashed=True),
+            # 2 行。**1 行に 5 つ並べるとラベルが接する。** Amazon Elastic Container Service と
+            # Amazon Elastic Kubernetes Service は 2 行に折っても 150px あり、5 つのラベル幅の
+            # 合計が枠の幅（885）に収まらない。コンピュートを上の行、ストレージを下の行にする。
+            Group("phase2", "phase2", 30, 600, 885, 350, gr_icon=None, kind="vpc", dashed=True),
+            Group("phase3", "phase3", 30, 990, 885, 350, gr_icon=None, kind="vpc", dashed=True),
         ),
         boxes=(
             Box("journey_now", "journey_now", 30, 100, 220, 62),
@@ -1130,13 +1161,22 @@ def _migration_journey() -> Diagram:
             Node("journey_rosa", "rosa", "journey_rosa", *centred("rosa", 830, 150)),
             Node("p1_ec2", "ec2", "p1_ec2", *centred("ec2", 200, 445)),
             Node("p1_fsx", "fsx_ontap", "p1_fsx", *centred("fsx_ontap", 520, 445)),
-            Node("p2_ecs", "ecs", "p2_ecs", *centred("ecs", 200, 695)),
-            Node("p2_eks", "eks", "p2_eks", *centred("eks", 500, 695)),
-            Node("p2_fsx", "fsx_ontap", "p2_fsx", *centred("fsx_ontap", 800, 695)),
-            Node("p3_fargate", "fargate", "p3_fargate", *centred("fargate", 170, 945)),
-            Node("p3_lambda", "lambda", "p3_lambda", *centred("lambda", 390, 945)),
-            Node("p3_s3", "s3", "p3_s3", *centred("s3", 610, 945)),
-            Node("p3_dynamodb", "dynamodb", "p3_dynamodb", *centred("dynamodb", 830, 945)),
+            # Phase 2 の上の行 = コンピュート。中心は 150 / 360 / 560 / 760 で、ラベル幅の
+            # 合計（545）に隙間を足した値から決めた。
+            Node("p2_ecs", "ecs", "p2_ecs", *centred("ecs", 150, 690)),
+            Node("p2_eks", "eks", "p2_eks", *centred("eks", 360, 690)),
+            Node("p2_batch", "batch", "p2_batch", *centred("batch", 560, 690)),
+            Node("p2_pcs", "pcs", "p2_pcs", *centred("pcs", 760, 690)),
+            # 下の行 = ストレージ。
+            Node("p2_fsx", "fsx_ontap", "p2_fsx", *centred("fsx_ontap", 200, 840)),
+            Node("p3_fargate", "fargate", "p3_fargate", *centred("fargate", 170, 1080)),
+            Node("p3_lambda", "lambda", "p3_lambda", *centred("lambda", 400, 1080)),
+            Node("p3_s3", "s3", "p3_s3", *centred("s3", 120, 1230)),
+            Node("p3_dynamodb", "dynamodb", "p3_dynamodb", *centred("dynamodb", 330, 1230)),
+            Node("p3_fsx", "fsx_ontap", "p3_fsx", *centred("fsx_ontap", 580, 1230)),
+            # リソースアイコンは 48px。**中心を 16px 下げてサービスアイコンとラベルの高さを
+            # 揃える。** 揃えないと 1 行の中でラベルのベースラインが 2 段になる。
+            Node("p3_s3ap", "s3_ap", "p3_s3ap", *centred("s3_ap", 810, 1246)),
         ),
         edges=(
             # 現在地から Phase 1 の枠へ。入口を 0.15 にしているのは、枠の中心（0.5）に入れると

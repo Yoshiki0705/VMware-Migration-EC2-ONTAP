@@ -73,13 +73,17 @@ AWS Transform 経由の移行は、データが流れる経路と、それを制
 
 > **この節は検証結果ではありません。** Phase 1（リホスト）だけが本プロジェクトの検証範囲で、Phase 2 / Phase 3 と選択肢は整理です。図の中の枠のタイトルにも同じことを書いています。
 
-![現在地の VMware ESXi から、リホスト以外の選択肢（Amazon Elastic VMware Service / NC2 + ONTAP / Red Hat OpenShift Service on AWS）と、Phase 1 リホスト（Amazon EC2 と Amazon FSx for NetApp ONTAP の iSCSI LUN）、Phase 2 リプラットフォーム（Amazon Elastic Container Service / Amazon Elastic Kubernetes Service / FSx for ONTAP の NFS と iSCSI）、Phase 3 リファクタ（AWS Fargate / AWS Lambda / Amazon Simple Storage Service / Amazon DynamoDB）へ段が進む図。](../_assets/images/atx-fsxn-migration-journey.svg)
+![現在地の VMware ESXi から、リホスト以外の選択肢（Amazon Elastic VMware Service / NC2 + ONTAP / Red Hat OpenShift Service on AWS）と、Phase 1 リホスト（Amazon EC2 と Amazon FSx for NetApp ONTAP の iSCSI LUN / NFS / SMB）、Phase 2 リプラットフォーム（Amazon Elastic Container Service / Amazon Elastic Kubernetes Service / AWS Batch / AWS Parallel Computing Service と FSx for ONTAP の NFS / SMB / iSCSI）、Phase 3 リファクタ（AWS Fargate / AWS Lambda / Amazon Simple Storage Service / Amazon DynamoDB / FSx for ONTAP と FSx for ONTAP S3 AP）へ段が進む図。](../_assets/images/atx-fsxn-migration-journey.svg)
 
-図 6: リホストから先の段と、リホスト以外の選択肢。Phase 1 で FSx for ONTAP にデータを置くと、Phase 2 以降でも同じボリュームを NFS / iSCSI のどちらでも参照できます。
+図 6: リホストから先の段と、リホスト以外の選択肢。各段は上の行がコンピュート、下の行がストレージです。
+
+**同じファイルシステムが段をまたいで使えることが、この図の要点です。** Phase 1 で FSx for ONTAP に置いたボリュームは、Phase 2 でコンテナやバッチのワークロードから NFS / SMB / iSCSI のどれでも参照でき、Phase 3 では FSx for ONTAP S3 AP を介してオブジェクト API からも読めます。移行のたびにデータを動かし直す必要がありません。
+
+**本検証で測ったのは Phase 1 の iSCSI だけです。** NFS と SMB は同じファイルシステムが同時に提供できるプロトコルですが、本プロジェクトでは iSCSI マルチパスのみを実測しています。Phase 2 / Phase 3 のサービスとの組み合わせも未検証です。
 
 **段の中に線を引いているのは Phase 1 だけです。** Phase 2 の Amazon Elastic Container Service と Amazon Elastic Kubernetes Service は互いに代替であって流れではないので、矢印を引くと「ECS の次が EKS」と読めてしまいます。枠と並びが「この段の構成要素」を表しています。Phase 1 の Amazon EC2 → FSx for ONTAP だけは実測した経路なので引いています。
 
-NC2（Nutanix）だけ箱で描いてあるのはサードパーティの製品だからです。公式アイコンは AWS のサービスにだけ使います。
+NC2（Nutanix）だけ箱で描いてあるのはサードパーティの製品だからです。公式アイコンは AWS のサービスにだけ使います。FSx for ONTAP S3 AP はサービスではなくファイルシステムの前に置く入口なので、サービスアイコンではなくリソースアイコン（48px）を使っています。
 
 ---
 
