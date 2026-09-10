@@ -33,7 +33,7 @@ Ordered by impact. The first three **bear directly on data integrity or migratio
 |---|---|---|---|
 | F1 | Defect-class | The job returns `COMPLETED` / `LAUNCHED` even when the final snapshot failed | A lost delta goes unnoticed |
 | F2 | Defect-class | The job reports success for an unbootable target caused by an inconsistent disk assignment | Finalizing without noticing removes the recovery path |
-| F3 | Missing capability | No way to repair an inconsistent disk assignment | Deleting and re-onboarding the source server is the only workaround |
+| F3 | Missing capability | No API repairs an inconsistent disk assignment | Rerunning the installer is the documented route; deleting the source server is not needed |
 | F4 | Documentation | The API initialization page opens as though roles are created for you, then asks you to create them in step 1 | The prerequisite is missed on the API / IaC path |
 | D1 | Documentation | No statement of the resources `SETUP_FSX_PROXY` creates in the customer VPC, or their cost | Migration cost estimates do not match reality |
 | D2 | Documentation | No statement that Finalize leaves the NLB and VPC endpoint service behind | Billing continues after the migration completes |
@@ -76,7 +76,7 @@ Ordered by impact. The first three **bear directly on data integrity or migratio
 
 **Workaround**: delete the source server and reinstall the agent. This restarts replication from the beginning.
 
-**Request**: provide an API that re-evaluates the assignment, or an operation that syncs the stored configuration to the actual layout. If that is not feasible by design, **state in the documentation that re-onboarding is the only route**.
+**Request**: provide an API that re-evaluates the assignment, or an operation that syncs the stored configuration to the actual layout. **Note that "re-onboarding is the only route" was wrong.** [Step 6 of the agent installation](https://docs.aws.amazon.com/mgn/latest/ug/linux-agent.html) names rerunning the installer as the way to restore a replicated-disk list that no longer matches the machine, and deleting the source server is not needed. What remains as a request is that this repair is not reachable from an API, and the validation messages described above.
 
 ### 3.4 F4: The API initialization page reads as though it cancels its own prerequisite
 
