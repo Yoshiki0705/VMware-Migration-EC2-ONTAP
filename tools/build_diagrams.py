@@ -266,6 +266,66 @@ CJK = re.compile(r"[\u203b\u3000-\u303f\u3040-\u30ff\u4e00-\u9fff\uff00-\uffef]"
 # the official name, and translating it would break it. Panel titles, footnotes and prose
 # are localized.
 LABELS: dict[str, dict[str, str]] = {
+    # --- figure 4: on-premises VMware to AWS ---------------------------------------
+    "onprem": {"ja": "オンプレミス", "en": "On-premises"},
+    "vcenter": {"ja": "vCenter Server", "en": "vCenter Server"},
+    "esxi": {"ja": "ESXi ホスト", "en": "ESXi host"},
+    "onprem_ontap": {
+        "ja": "ONTAP\n（NFS データストア）",
+        "en": "ONTAP\n(NFS datastore)",
+    },
+    "shift_toolkit": {
+        "ja": "Shift Toolkit\n（Windows）",
+        "en": "Shift Toolkit\n(Windows)",
+    },
+    "source_vm": {
+        "ja": "移行元 VM\n（OS / データとも VMDK）",
+        "en": "Source VM\n(OS and data as VMDK)",
+    },
+    "target_ec2_boot": {
+        "ja": "Amazon EC2\n（移行先 / Nitro）",
+        "en": "Amazon EC2\n(target / Nitro)",
+    },
+    "ebs_boot": {
+        "ja": "Amazon Elastic Block Store\n（ブートディスク）",
+        "en": "Amazon Elastic Block Store\n(boot disk)",
+    },
+    "fsx_data": {
+        "ja": "Amazon FSx for NetApp ONTAP\n（iSCSI LUN)",
+        "en": "Amazon FSx for NetApp ONTAP\n(iSCSI LUN)",
+    },
+    "e_snapmirror": {"ja": "SnapMirror", "en": "SnapMirror"},
+    # 2 行。オンプレミスの枠は幅 280 で、縦のエッジ（x=160）の右に置ける余地は 140px しか
+    # ない。1 行の JA（約 190px）はどこに置いても枠の右辺か線のどちらかに重なる。
+    "e_flexclone": {
+        "ja": "FlexClone と\nディスク変換",
+        "en": "FlexClone and\ndisk conversion",
+    },
+    "e_iscsi_mp": {"ja": "iSCSI マルチパス", "en": "iSCSI multipath"},
+    # --- figure 5: iSCSI multipath -------------------------------------------------
+    "fsx_multiaz": {
+        "ja": "Amazon FSx for NetApp ONTAP（Multi-AZ）",
+        "en": "Amazon FSx for NetApp ONTAP (Multi-AZ)",
+    },
+    "client_ec2": {
+        "ja": "Amazon EC2\n（iSCSI イニシエーター）",
+        "en": "Amazon EC2\n(iSCSI initiator)",
+    },
+    "lif_pref": {
+        "ja": "iSCSI LIF\n（優先 AZ）",
+        "en": "iSCSI LIF\n(preferred AZ)",
+    },
+    "lif_standby": {
+        "ja": "iSCSI LIF\n（待機 AZ）",
+        "en": "iSCSI LIF\n(standby AZ)",
+    },
+    "lun": {"ja": "LUN", "en": "LUN"},
+    # 優先度の数値（50 / 10）は本文にある。**図の中で最も文字数の多い部分が、画像が縮小された
+    # ときに最初に読めなくなる。** ここは経路の区別だけを持たせ、値は本文と表に置く。
+    # 短くしたのは可読性のためだけではない: Amazon EC2 と iSCSI LIF の水平区間は 140px で、
+    # JA の元のラベル（約 230px）はどこに置いてもアイコンか箱に重なる。
+    "e_path_active": {"ja": "パス 1（active）", "en": "Path 1 (active)"},
+    "e_path_standby": {"ja": "パス 2（standby）", "en": "Path 2 (standby)"},
     # --- figure 1 -------------------------------------------------------------------
     "aws_cloud": {"ja": "AWS クラウド（ap-northeast-1）", "en": "AWS Cloud (ap-northeast-1)"},
     "vpc": {"ja": "利用者の Amazon VPC", "en": "Customer Amazon VPC"},
@@ -810,7 +870,184 @@ def _finalize() -> Diagram:
     )
 
 
-DIAGRAMS = (_data_path(), _control_path(), _finalize())
+def _onprem_to_aws() -> Diagram:
+    """オンプレミスの VMware から Amazon EC2 + FSx for ONTAP へ。既存 3 図が AWS Transform の
+    内側だけを描いているのに対し、この図は**移行元**を含む。
+
+    左に 1 列、右に AWS。オンプレミスの列は上から下へ、vCenter Server → ESXi → 移行元 VM →
+    Shift Toolkit → ONTAP。**Shift Toolkit を移行元 VM と ONTAP の間に置いたのは向きのため
+    だけではない。** 変換を行う位置がそこなので、読む順序と処理の順序が一致する。
+
+    ONTAP から FSx for ONTAP への SnapMirror が図の背骨。FSx for ONTAP を ONTAP より下に
+    置いてあるのは、右へ出て上がると向きの規則を破るため。
+
+    **VM Import/Export のエッジは引いていない。** ブートディスクだけを Amazon Elastic Block
+    Store へ運ぶ別経路で、移行元 VM から見て EBS は右上にあり、線を引くと上向きになる。1 本
+    落として本文へ移すのは規格が認めている扱いで、代わりにキャプションで触れる。
+
+    Shift Toolkit と ONTAP はサードパーティなので箱で表し、公式アイコンは AWS のサービスに
+    だけ使う。
+    """
+    return Diagram(
+        name="atx-fsxn-onprem-to-aws",
+        diagram_id="atx-fsxn-onprem-to-aws",
+        # 既存図と同じ 940。実効サイズは 16 x 880/964 = 14.6px で下限を超える。
+        width=940,
+        # 660。FSx for ONTAP のラベルは 2 行あり、アイコン下端 510 から 554 まで伸びる。
+        # 枠を 600 で閉じるのは、**目視で下端をラベルが越えていたため**。ゲートは越境を見ない。
+        height=660,
+        groups=(
+            # オンプレミスを 280、AWS を 575 に振った。**アイコンのラベルは箱と違って幅を
+            # 指定できず、サービス名の長さがそのまま必要な間隔になる。**「Amazon Elastic
+            # Block Store」は 2 行でも約 200px あり、AWS 側が 395px だと EC2 のラベルと
+            # 横に並べられない。箱側のテキストは短いので、幅は箱から取って絵に渡す。
+            Group("onprem", "onprem", 20, 40, 280, 530, gr_icon=None, kind="vpc", dashed=True),
+            Group("aws_cloud", "aws_cloud", 340, 40, 575, 560),
+        ),
+        boxes=(
+            Box("vcenter", "vcenter", 40, 90, 240, 52),
+            Box("esxi", "esxi", 40, 170, 240, 52),
+            Box("source_vm", "source_vm", 40, 250, 240, 62),
+            Box("shift_toolkit", "shift_toolkit", 40, 340, 240, 52),
+            # 間隔 47px。**2 行のエッジラベルは 44px 必要で、以前の 28px では上下の箱の枠線に
+            # 文字が重なっていた。** 箱の間隔は見た目の余白ではなくラベルの行数で決まる。
+            Box("onprem_ontap", "onprem_ontap", 40, 439, 240, 62),
+        ),
+        nodes=(
+            Node("target_ec2", "ec2", "target_ec2_boot", *centred("ec2", 450, 130)),
+            # 中心 760。EC2 のラベル右端（約 510）との間に 150px 空く。**以前は 620 と 780 で
+            # 160px しか離しておらず、2 つのラベルが接していた。** アイコン間の距離ではなく
+            # ラベル幅の合計で決める。
+            Node("ebs_boot", "ebs", "ebs_boot", *centred("ebs", 760, 130)),
+            # Amazon Elastic Block Store の真下。**以前は Amazon EC2 の真下に置いていたが、
+            # そこへ下向きのエッジを引くと線が EC2 自身のラベルを縦に貫く。** アイコンの下は
+            # そのアイコンのラベルの領域なので、下へ抜けるのではなく右へ出て降りる。
+            Node("fsx_data", "fsx_ontap", "fsx_data", *centred("fsx_ontap", 760, 470)),
+        ),
+        edges=(
+            Edge("e_vc_esxi", "vcenter", "esxi", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            Edge("e_esxi_vm", "esxi", "source_vm", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            Edge("e_vm_shift", "source_vm", "shift_toolkit", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            Edge(
+                "e_shift_ontap",
+                "shift_toolkit",
+                "onprem_ontap",
+                "e_flexclone",
+                exit_at=(0.5, 1),
+                entry_at=(0.5, 0),
+                offset=(0, 75, 0),
+            ),
+            # ラベルは曲がり角（x=560）の手前に置く。**中点は曲がり角そのもので、そこに置くと
+            # 文字が縦の区間を跨ぐ。** along を負にして源側へ寄せる。
+            Edge(
+                "e_sm",
+                "onprem_ontap",
+                "fsx_data",
+                "e_snapmirror",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.75),
+                points=((560, 470), (560, 490)),
+                offset=(-0.38, 0, -14),
+            ),
+            # 2 本とも Amazon EC2 の右辺から出る。同じ点から出すと重なるので高さを分ける。
+            Edge("e_ec2_ebs", "target_ec2", "ebs_boot", exit_at=(1, 0.35), entry_at=(0, 0.35)),
+            # 入口は 0.25、SnapMirror は 0.75。**同じ辺の同じ点へ 2 本入れると矢頭が重なって
+            # 1 本に見える。** ラベルは縦の区間の右に置く（左は EC2 のラベル、真上は線）。
+            Edge(
+                "e_ec2_fsx",
+                "target_ec2",
+                "fsx_data",
+                "e_iscsi_mp",
+                exit_at=(1, 0.75),
+                entry_at=(0, 0.25),
+                offset=(0.0, 80, 0),
+            ),
+        ),
+    )
+
+
+def _iscsi_multipath() -> Diagram:
+    """1 つの LUN に 2 本のパス。**ホスト側の multipath がフェイルオーバーの仕組みそのもの**で、
+    ストレージ側は複数のパスを見せるところまでという分界線を示す。
+
+    左上から右下へ。Amazon EC2 が左、iSCSI LIF が 2 つ**縦に**並び、LUN が右下。
+
+    **LIF を横に並べて LUN をその下の中央に置くと、右の LIF から LUN へのエッジが左向きに
+    なる。** 2 つの対等なノードが 1 つのターゲットへ収束する形は、ターゲットが両方の右下に
+    ないかぎり「右か下」を両腕で満たせない。LIF を縦に積んで LUN を右下に置くと 4 本すべてが
+    右下へ進む。LIF が同じ x にあることは対等であることの表現でもある。
+
+    優先度は色ではなくエッジのラベルで示す（矢印の色分けは禁止）。パス数は既定でも上限でも
+    なく帯域から決める値で、その算術は図ではなく本文にある。
+    """
+    return Diagram(
+        name="atx-fsxn-iscsi-multipath",
+        diagram_id="atx-fsxn-iscsi-multipath",
+        width=940,
+        height=560,
+        groups=(
+            Group("aws_cloud", "aws_cloud", 25, 30, 890, 495),
+            # 左端を 430 に寄せた。**エッジのラベルが置ける場所は、線と線の間ではなく
+            # 「線と枠の境界の間」で決まる。** 以前は 290 で、Amazon EC2 のラベル右端（225）
+            # から境界までが 65px しかなく、パスのラベルが境界線の上に載っていた。
+            Group(
+                "fsx_multiaz",
+                "fsx_multiaz",
+                430,
+                150,
+                470,
+                350,
+                gr_icon=None,
+                kind="vpc",
+                dashed=True,
+            ),
+        ),
+        boxes=(
+            Box("lif_pref", "lif_pref", 480, 200, 220, 62),
+            Box("lif_standby", "lif_standby", 480, 330, 220, 62),
+            # 左辺（740）が iSCSI LIF の右辺（700）より右にある。**入口が出口より左にあると
+            # エッジは左へ戻る**ので、この 40px は装飾ではなく向きの条件。
+            Box("lun", "lun", 740, 420, 150, 52),
+        ),
+        # 縦の中心を iSCSI LIF（優先 AZ）と揃えて 231。**揃えるとパス 1 が直線になり、曲がり
+        # 角が消える。** 曲がり角があるとラベルがその縦区間を跨ぐ位置に落ちる。
+        nodes=(Node("client_ec2", "ec2", "client_ec2", *centred("ec2", 150, 231)),),
+        edges=(
+            Edge(
+                "e_p1",
+                "client_ec2",
+                "lif_pref",
+                "e_path_active",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+            # **右辺から出る。** 以前は下辺（0.5, 1）から出していて、線が Amazon EC2 自身の
+            # ラベルを縦に貫いていた。ラベルはアイコンより広く「（iSCSI イニシエーター）」は
+            # x 50 まで伸びるので、縦の区間は x=270 に置く。
+            Edge(
+                "e_p2",
+                "client_ec2",
+                "lif_standby",
+                "e_path_standby",
+                exit_at=(1, 0.75),
+                entry_at=(0, 0.5),
+                points=((270, 251), (270, 361)),
+                offset=(0.55, 0, -14),
+            ),
+            Edge("e_l1", "lif_pref", "lun", exit_at=(1, 0.5), entry_at=(0, 0.5)),
+            Edge("e_l2", "lif_standby", "lun", exit_at=(1, 0.5), entry_at=(0, 0.5)),
+        ),
+    )
+
+
+DIAGRAMS = (
+    _data_path(),
+    _control_path(),
+    _finalize(),
+    _onprem_to_aws(),
+    _iscsi_multipath(),
+)
 
 # --- rendering ---------------------------------------------------------------------------
 
