@@ -89,6 +89,8 @@ graph TD
         p3_data["Amazon S3 / Amazon DynamoDB"]
         p3_compute --> p3_data
     end
+%% 色はノードに付ける。subgraph に fill を付けるとタイトルの文字色はテーマ側が決めるので、
+%% ダークモードで白文字が薄い塗りに乗って読めなくなる。
 
     Phase1 --> Phase2
     Phase2 --> Phase3
@@ -97,10 +99,12 @@ graph TD
     NC2["NC2 + ONTAP<br/>（Nutanix）"]
     ROSA["ROSA + FSx for ONTAP<br/>（OpenShift）"]
 
-    style Phase1 fill:#e3f2fd
-    style Phase2 fill:#f3e5f5
-    style Phase3 fill:#e8f5e9
-    style VMware fill:#ff9800,color:#fff
+    style p1_ec2 fill:#e3f2fd,color:#0b2942,stroke:#1D428A
+    style p2_orch fill:#f3e5f5,color:#2b1b2e,stroke:#7b3f8c
+    style p2_storage fill:#f3e5f5,color:#2b1b2e,stroke:#7b3f8c
+    style p3_compute fill:#e8f5e9,color:#14301a,stroke:#2e7d32
+    style p3_data fill:#e8f5e9,color:#14301a,stroke:#2e7d32
+    style VMware fill:#ff9800,color:#000,stroke:#8a4f00
 ```
 
 図 6: リホストから先の選択肢。Phase 1 で FSx for ONTAP にデータを置くと、Phase 2 以降でも同じボリュームを NFS / iSCSI のどちらでも参照できます。
@@ -119,11 +123,11 @@ flowchart TD
     Q3{"既存の Veeam 環境が<br/>あるか"}
     Q4{"規模と自動化の要件は"}
 
-    ATX_ONTAP["AWS Transform<br/>継続レプリケーション。<br/>FSx for ONTAP 宛先は Public Preview"]
-    Shift["NetApp Shift Toolkit<br/>FlexClone でデータを変換。<br/>Early Preview"]
-    Veeam["Veeam Restore to EC2<br/>既存バックアップから復元"]
-    ATX_ANY["AWS Transform<br/>移行元を問わない"]
-    VMImport["VM Import/Export<br/>単発・小規模"]
+    ATX_ONTAP["AWS Transform"]
+    Shift["NetApp Shift Toolkit"]
+    Veeam["Veeam Restore to EC2"]
+    ATX_ANY["AWS Transform"]
+    VMImport["VM Import/Export"]
 
     Start --> Q1
     Q1 -->|Yes| Q2
@@ -135,12 +139,14 @@ flowchart TD
     Q4 -->|"大規模 / 自動化必須"| ATX_ANY
     Q4 -->|"小規模 / 単発"| VMImport
 
-    style Shift fill:#0067C5,color:#fff
-    style ATX_ONTAP fill:#FF9900,color:#000
-    style ATX_ANY fill:#FF9900,color:#000
+    style Shift fill:#0067C5,color:#fff,stroke:#00447f
+    style ATX_ONTAP fill:#FF9900,color:#000,stroke:#8a5200
+    style ATX_ANY fill:#FF9900,color:#000,stroke:#8a5200
 ```
 
-図 7: 4 方式の分岐。AWS Transform は移行元を問わないため 2 か所に現れます。どの方式も排他ではなく、VM 特性ごとに使い分ける前提です（[組み合わせパターン](../ja/migration-method-comparison.md#6-組み合わせパターン)）。
+図 7: 4 方式の分岐。AWS Transform は移行元を問わないため 2 か所に現れます。**葉には方式名しか入れていません。** 成熟度（AWS Transform の FSx for ONTAP 宛先は Public Preview、Shift Toolkit は Early Preview）と各方式の制約は比較表にあり、図に入れると横幅が 2 倍になって縮小時に読めなくなります。
+
+どの方式も排他ではなく、VM 特性ごとに使い分ける前提です（[組み合わせパターン](../ja/migration-method-comparison.md#6-組み合わせパターン)）。
 
 ---
 
