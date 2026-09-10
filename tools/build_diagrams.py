@@ -104,6 +104,18 @@ ICONS = {
     "fargate": "Architecture-Service-Icons_{d}/Arch_Containers/64/Arch_AWS-Fargate_64.svg",
     "lambda": "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Lambda_64.svg",
     "batch": "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Batch_64.svg",
+    # Arch_AWS-Thinkbox-Deadline も同梱されているが別物。**旧称のアイコンを拾わない。**
+    "deadline": (
+        "Architecture-Service-Icons_{d}/Arch_Media-Services/64/Arch_AWS-Deadline-Cloud_64.svg"
+    ),
+    "cloudfront": (
+        "Architecture-Service-Icons_{d}/Arch_Networking-Content-Delivery/64/"
+        "Arch_Amazon-CloudFront_64.svg"
+    ),
+    "transfer_family": (
+        "Architecture-Service-Icons_{d}/Arch_Migration-Modernization/64/"
+        "Arch_AWS-Transfer-Family_64.svg"
+    ),
     "pcs": (
         "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Parallel-Computing-Service_64.svg"
     ),
@@ -147,6 +159,9 @@ ICON_SIZE = {
     "lambda": 80,
     "batch": 80,
     "pcs": 80,
+    "deadline": 80,
+    "cloudfront": 80,
+    "transfer_family": 80,
     "s3": 80,
     "dynamodb": 80,
     "s3_ap": 48,
@@ -425,6 +440,10 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "AWS Parallel\nComputing Service",
         "en": "AWS Parallel\nComputing Service",
     },
+    "p2_deadline": {"ja": "AWS Deadline\nCloud", "en": "AWS Deadline\nCloud"},
+    "p2_cloudfront": {"ja": "Amazon CloudFront", "en": "Amazon CloudFront"},
+    "p2_transfer": {"ja": "AWS Transfer Family", "en": "AWS Transfer Family"},
+    "p2_s3ap": {"ja": "S3 Access Points", "en": "S3 Access Points"},
     "p2_fsx": {
         "ja": "Amazon FSx for NetApp ONTAP\n（NFS / SMB / iSCSI）",
         "en": "Amazon FSx for NetApp ONTAP\n(NFS / SMB / iSCSI)",
@@ -440,9 +459,10 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Amazon FSx for NetApp ONTAP",
         "en": "Amazon FSx for NetApp ONTAP",
     },
-    # 命名規約どおり「FSx for ONTAP S3 AP」。**bare な「S3 AP」は使わない。** Amazon S3 の
-    # アクセスポイントと同じ名前で別のものなので、どちらの入口かが名前に要る。
-    "p3_s3ap": {"ja": "FSx for ONTAP S3 AP", "en": "FSx for ONTAP S3 AP"},
+    # **「S3 AP」という略称は AWS が認めた表記ではない。** 以前は「FSx for ONTAP S3 AP」と
+    # 書いていたが、略さず「S3 Access Points」にする。どのファイルシステムの入口かは隣に
+    # 並ぶ Amazon FSx for NetApp ONTAP のアイコンが示す。
+    "p3_s3ap": {"ja": "S3 Access Points", "en": "S3 Access Points"},
     # --- figure 1 -------------------------------------------------------------------
     "aws_cloud": {"ja": "AWS クラウド（ap-northeast-1）", "en": "AWS Cloud (ap-northeast-1)"},
     "vpc": {"ja": "利用者の Amazon VPC", "en": "Customer Amazon VPC"},
@@ -1161,22 +1181,40 @@ def _migration_journey() -> Diagram:
             Node("journey_rosa", "rosa", "journey_rosa", *centred("rosa", 830, 150)),
             Node("p1_ec2", "ec2", "p1_ec2", *centred("ec2", 200, 445)),
             Node("p1_fsx", "fsx_ontap", "p1_fsx", *centred("fsx_ontap", 520, 445)),
-            # Phase 2 の上の行 = コンピュート。中心は 150 / 360 / 560 / 760 で、ラベル幅の
-            # 合計（545）に隙間を足した値から決めた。
-            Node("p2_ecs", "ecs", "p2_ecs", *centred("ecs", 150, 690)),
-            Node("p2_eks", "eks", "p2_eks", *centred("eks", 360, 690)),
-            Node("p2_batch", "batch", "p2_batch", *centred("batch", 560, 690)),
-            Node("p2_pcs", "pcs", "p2_pcs", *centred("pcs", 760, 690)),
-            # 下の行 = ストレージ。
-            Node("p2_fsx", "fsx_ontap", "p2_fsx", *centred("fsx_ontap", 200, 840)),
+            # Phase 2 の上の行 = コンピュート。**中心はラベルの幅から決める。** 左端 50 から
+            # 順に、ラベルの幅 + 隙間 25 を積んだ位置に中心を置いている。アイコンの間隔を
+            # 等分すると、幅の広いラベルの隣で必ず接触する。
+            Node("p2_ecs", "ecs", "p2_ecs", *centred("ecs", 125, 690)),
+            Node("p2_eks", "eks", "p2_eks", *centred("eks", 303, 690)),
+            Node("p2_batch", "batch", "p2_batch", *centred("batch", 449, 690)),
+            Node("p2_pcs", "pcs", "p2_pcs", *centred("pcs", 594, 690)),
+            Node("p2_deadline", "deadline", "p2_deadline", *centred("deadline", 752, 690)),
+            # 下の行 = データの入口とストレージ。
+            Node(
+                "p2_cloudfront",
+                "cloudfront",
+                "p2_cloudfront",
+                *centred("cloudfront", 130, 840),
+            ),
+            Node(
+                "p2_transfer",
+                "transfer_family",
+                "p2_transfer",
+                *centred("transfer_family", 318, 840),
+            ),
+            # 48px なので中心を 16px 下げて、隣の 80px のアイコンとラベルの高さを揃える。
+            Node("p2_s3ap", "s3_ap", "p2_s3ap", *centred("s3_ap", 496, 856)),
+            Node("p2_fsx", "fsx_ontap", "p2_fsx", *centred("fsx_ontap", 699, 840)),
             Node("p3_fargate", "fargate", "p3_fargate", *centred("fargate", 170, 1080)),
             Node("p3_lambda", "lambda", "p3_lambda", *centred("lambda", 400, 1080)),
-            Node("p3_s3", "s3", "p3_s3", *centred("s3", 120, 1230)),
-            Node("p3_dynamodb", "dynamodb", "p3_dynamodb", *centred("dynamodb", 330, 1230)),
-            Node("p3_fsx", "fsx_ontap", "p3_fsx", *centred("fsx_ontap", 580, 1230)),
-            # リソースアイコンは 48px。**中心を 16px 下げてサービスアイコンとラベルの高さを
-            # 揃える。** 揃えないと 1 行の中でラベルのベースラインが 2 段になる。
-            Node("p3_s3ap", "s3_ap", "p3_s3ap", *centred("s3_ap", 810, 1246)),
+            Node("p3_s3", "s3", "p3_s3", *centred("s3", 115, 1230)),
+            Node("p3_dynamodb", "dynamodb", "p3_dynamodb", *centred("dynamodb", 288, 1230)),
+            # **アクセスポイントはファイルシステムの手前に置く。** Phase 2 と並び順を揃えて
+            # いる。片方だけ後ろにあると、同じ図の中で 2 通りの読み方ができてしまう。
+            # リソースアイコンは 48px なので中心を 16px 下げて、サービスアイコンとラベルの
+            # 高さを揃える。揃えないと 1 行の中でラベルのベースラインが 2 段になる。
+            Node("p3_s3ap", "s3_ap", "p3_s3ap", *centred("s3_ap", 466, 1246)),
+            Node("p3_fsx", "fsx_ontap", "p3_fsx", *centred("fsx_ontap", 669, 1230)),
         ),
         edges=(
             # 現在地から Phase 1 の枠へ。入口を 0.15 にしているのは、枠の中心（0.5）に入れると
