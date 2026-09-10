@@ -12,10 +12,12 @@
 
 | 系統 | 対象 | 描き方 | 置き場 |
 |------|------|--------|--------|
-| 構成図 | 実在するリソースと経路 | draw.io + AWS 公式アーキテクチャアイコン（`tools/build_diagrams.py` が生成） | `docs/_assets/diagrams/*.drawio` → `docs/_assets/images/*.svg` |
-| 判断の分岐 | 移行ジャーニー、方式選定 | Mermaid（このページに直接） | このファイル |
+| 構成図・段の図 | AWS サービスが登場するもの | draw.io + AWS 公式アーキテクチャアイコン（`tools/build_diagrams.py` が生成） | `docs/_assets/diagrams/*.drawio` → `docs/_assets/images/*.svg` |
+| 判断の分岐 | 方式選定 | Mermaid（このページに直接） | このファイル |
 
-分けている理由は 2 つあります。**未検証の将来フェーズに公式アイコンを付けると、推測が構成図に見えます。** 移行ジャーニーの Phase 2 / Phase 3 は本プロジェクトで検証しておらず、意思決定の見取り図であって構成ではありません。もう 1 つは、方式選定の分岐が選ぶ対象がツールであって AWS サービスではないため、サービスアイコンが意味を持たないことです。
+**AWS サービスが出てくる図は、検証済みかどうかに関わらず公式アイコンと公式サービス名で描きます。** 読者がサービスを取り違える方が、未検証の段が構成図に見えることより害が大きいためです。検証範囲は図の中の枠のタイトルと本文で示します。
+
+Mermaid で書くのは方式選定だけです。選ぶ対象がツールであって AWS サービスではないので、サービスアイコンが意味を持ちません。
 
 構成図の生成・検査手順は [図の作り方](../agent/diagrams.md) にあります。英語版は同じディレクトリの `-en` 付きファイルです。
 
@@ -23,11 +25,17 @@
 
 ## 移行元から AWS までの全体構成
 
-![オンプレミスの vCenter Server / ESXi ホスト / 移行元 VM / Shift Toolkit / ONTAP が縦に並び、ONTAP から SnapMirror で AWS 側の Amazon FSx for NetApp ONTAP へ複製される。AWS 側では Amazon EC2 がブートディスクを Amazon Elastic Block Store に、データを FSx for ONTAP の iSCSI LUN に持つ。](../_assets/images/atx-fsxn-onprem-to-aws.svg)
+![オンプレミスの Shift Toolkit / VMware ESXi と vCenter Server / 移行元 VM / ONTAP（NFS データストア）が縦に並び、ONTAP から SnapMirror で AWS 側の Amazon FSx for NetApp ONTAP 上の宛先ボリュームへ VMDK が複製される。その宛先ボリュームから、break 後に VMDK から変換された同じボリューム上の iSCSI LUN が生まれ、Amazon EC2 に iSCSI マルチパスで提供される。ブートディスクは Amazon Elastic Block Store から AMI として提供される。](../_assets/images/atx-fsxn-onprem-to-aws.svg)
 
-図 1: NetApp Shift Toolkit を使う場合の移行元と移行先。Amazon FSx for NetApp ONTAP（以降 FSx for ONTAP）はデータディスクを iSCSI LUN として受け、ブートディスクは Amazon Elastic Block Store に載ります。
+図 1: NetApp Shift Toolkit を使う場合の移行元と移行先。Amazon FSx for NetApp ONTAP（以降 FSx for ONTAP）側に状態が 2 つあることを分けて描いています。
 
-**VM Import/Export の経路は図に描いていません。** ブートディスクだけを Amazon Elastic Block Store へ運ぶ別経路で、移行元 VM から見ると Amazon Elastic Block Store が右上にあり、線を引くと上向きになります。手順は [VM Import/Export 手順書](../ja/vm-import-procedure.md) にあります。
+**SnapMirror が運ぶのは VMDK で、LUN ではありません。** 複製先は NFS データストアの中身（VMDK ファイル）をそのまま持つボリュームです。iSCSI LUN になるのはその後で、[Shift Toolkit 移行手順書](../ja/shift-toolkit-ec2-procedure.md) の Phase 4 では break がステップ 5、VMDK → LUN 変換がステップ 9 です。つまり変換は FSx for ONTAP 側で break の後に起きます。
+
+**この経路で FSx for ONTAP が NFS を提供する場面はありません。** NFS はソース側のデータストアだけで、AWS 側のデータアクセスは iSCSI のみです（同手順書の必要ポート表に 2049 はなく、3260 があります）。したがって「NFS 用と iSCSI 用を別に描く」ではなく「1 本のボリュームの前後の状態を分けて描く」形にしています。
+
+**変換は FlexClone ベースでサイズにほぼ依存しません。** ただしこの値は NetApp の記述と手順書の見積り表によるもので、本プロジェクトの実測ではありません。実測したのはブートディスク側の 10 ステップ（50 GB で約 1 時間 49 分。うち S3 アップロード 68 分、AMI インポート 36 分）で、データディスクの LUN 変換は測定範囲外です。内訳は [移行方式比較](../ja/migration-method-comparison.md#4-ダウンタイム比較実測--推定) にあります。
+
+**VM Import/Export の経路は図に描いていません。** ブートディスクは VMDK → RAW → Amazon S3 → AMI という別経路をたどりますが、中間の S3 と AMI を描くと図が 2 倍になります。手順は [VM Import/Export 手順書](../ja/vm-import-procedure.md) にあります。
 
 ---
 
@@ -61,53 +69,17 @@ AWS Transform 経由の移行は、データが流れる経路と、それを制
 
 ---
 
-## 移行ジャーニーの見取り図
+## 移行ジャーニーの段
 
-> **この節は検証結果ではありません。** Phase 1（リホスト）だけが本プロジェクトの検証範囲で、Phase 2 / Phase 3 と代替案は選択肢の整理です。
+> **この節は検証結果ではありません。** Phase 1（リホスト）だけが本プロジェクトの検証範囲で、Phase 2 / Phase 3 と選択肢は整理です。図の中の枠のタイトルにも同じことを書いています。
 
-```mermaid
-graph TD
-    VMware["VMware ESXi<br/>（現在地）"]
+![現在地の VMware ESXi から、リホスト以外の選択肢（Amazon Elastic VMware Service / NC2 + ONTAP / Red Hat OpenShift Service on AWS）と、Phase 1 リホスト（Amazon EC2 と Amazon FSx for NetApp ONTAP の iSCSI LUN）、Phase 2 リプラットフォーム（Amazon Elastic Container Service / Amazon Elastic Kubernetes Service / FSx for ONTAP の NFS と iSCSI）、Phase 3 リファクタ（AWS Fargate / AWS Lambda / Amazon Simple Storage Service / Amazon DynamoDB）へ段が進む図。](../_assets/images/atx-fsxn-migration-journey.svg)
 
-    VMware --> Phase1
-    VMware --> EVS
-    VMware --> NC2
-    VMware --> ROSA
+図 6: リホストから先の段と、リホスト以外の選択肢。Phase 1 で FSx for ONTAP にデータを置くと、Phase 2 以降でも同じボリュームを NFS / iSCSI のどちらでも参照できます。
 
-    subgraph Phase1["Phase 1: リホスト（本プロジェクトの検証範囲）"]
-        p1_ec2["Amazon EC2 + FSx for ONTAP<br/>（iSCSI）"]
-    end
+**段の中に線を引いているのは Phase 1 だけです。** Phase 2 の Amazon Elastic Container Service と Amazon Elastic Kubernetes Service は互いに代替であって流れではないので、矢印を引くと「ECS の次が EKS」と読めてしまいます。枠と並びが「この段の構成要素」を表しています。Phase 1 の Amazon EC2 → FSx for ONTAP だけは実測した経路なので引いています。
 
-    subgraph Phase2["Phase 2: リプラットフォーム"]
-        p2_orch["Amazon ECS / Amazon EKS<br/>（EC2 モード）"]
-        p2_storage["FSx for ONTAP<br/>（NFS / iSCSI）"]
-        p2_orch --> p2_storage
-    end
-
-    subgraph Phase3["Phase 3: リファクタ"]
-        p3_compute["AWS Fargate / AWS Lambda"]
-        p3_data["Amazon S3 / Amazon DynamoDB"]
-        p3_compute --> p3_data
-    end
-%% 色はノードに付ける。subgraph に fill を付けるとタイトルの文字色はテーマ側が決めるので、
-%% ダークモードで白文字が薄い塗りに乗って読めなくなる。
-
-    Phase1 --> Phase2
-    Phase2 --> Phase3
-
-    EVS["Amazon EVS<br/>（VMware を継続）"]
-    NC2["NC2 + ONTAP<br/>（Nutanix）"]
-    ROSA["ROSA + FSx for ONTAP<br/>（OpenShift）"]
-
-    style p1_ec2 fill:#e3f2fd,color:#0b2942,stroke:#1D428A
-    style p2_orch fill:#f3e5f5,color:#2b1b2e,stroke:#7b3f8c
-    style p2_storage fill:#f3e5f5,color:#2b1b2e,stroke:#7b3f8c
-    style p3_compute fill:#e8f5e9,color:#14301a,stroke:#2e7d32
-    style p3_data fill:#e8f5e9,color:#14301a,stroke:#2e7d32
-    style VMware fill:#ff9800,color:#000,stroke:#8a4f00
-```
-
-図 6: リホストから先の選択肢。Phase 1 で FSx for ONTAP にデータを置くと、Phase 2 以降でも同じボリュームを NFS / iSCSI のどちらでも参照できます。
+NC2（Nutanix）だけ箱で描いてあるのはサードパーティの製品だからです。公式アイコンは AWS のサービスにだけ使います。
 
 ---
 

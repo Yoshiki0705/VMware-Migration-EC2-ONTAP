@@ -84,6 +84,29 @@ ICONS = {
     "ebs": (
         "Architecture-Service-Icons_{d}/Arch_Storage/64/Arch_Amazon-Elastic-Block-Store_64.svg"
     ),
+    # 移行ジャーニーの図で使う。Amazon EVS と ROSA は AWS のサービスなので公式アイコンを
+    # 使う。NC2（Nutanix）はサードパーティなので箱で描く。
+    "evs": (
+        "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_Amazon-Elastic-VMware-Service_64.svg"
+    ),
+    "ecs": (
+        "Architecture-Service-Icons_{d}/Arch_Containers/64/"
+        "Arch_Amazon-Elastic-Container-Service_64.svg"
+    ),
+    "eks": (
+        "Architecture-Service-Icons_{d}/Arch_Containers/64/"
+        "Arch_Amazon-Elastic-Kubernetes-Service_64.svg"
+    ),
+    "rosa": (
+        "Architecture-Service-Icons_{d}/Arch_Containers/64/"
+        "Arch_Red-Hat-OpenShift-Service-on-AWS_64.svg"
+    ),
+    "fargate": "Architecture-Service-Icons_{d}/Arch_Containers/64/Arch_AWS-Fargate_64.svg",
+    "lambda": "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Lambda_64.svg",
+    "s3": (
+        "Architecture-Service-Icons_{d}/Arch_Storage/64/Arch_Amazon-Simple-Storage-Service_64.svg"
+    ),
+    "dynamodb": "Architecture-Service-Icons_{d}/Arch_Databases/64/Arch_Amazon-DynamoDB_64.svg",
     "privatelink": (
         "Architecture-Service-Icons_{d}/Arch_Networking-Content-Delivery/64/"
         "Arch_AWS-PrivateLink_64.svg"
@@ -106,6 +129,14 @@ ICON_SIZE = {
     "fsx_ontap": 80,
     "transform": 80,
     "ebs": 80,
+    "evs": 80,
+    "ecs": 80,
+    "eks": 80,
+    "rosa": 80,
+    "fargate": 80,
+    "lambda": 80,
+    "s3": 80,
+    "dynamodb": 80,
     "privatelink": 80,
     "secrets_manager": 80,
     "nlb": 48,
@@ -268,11 +299,15 @@ CJK = re.compile(r"[\u203b\u3000-\u303f\u3040-\u30ff\u4e00-\u9fff\uff00-\uffef]"
 LABELS: dict[str, dict[str, str]] = {
     # --- figure 4: on-premises VMware to AWS ---------------------------------------
     "onprem": {"ja": "オンプレミス", "en": "On-premises"},
-    "vcenter": {"ja": "vCenter Server", "en": "vCenter Server"},
-    "esxi": {"ja": "ESXi ホスト", "en": "ESXi host"},
+    "onprem_vmware": {
+        "ja": "VMware ESXi / vCenter Server",
+        "en": "VMware ESXi / vCenter Server",
+    },
+    # **VMDK を格納していることを書く。** これを書かないと、右の SnapMirror 宛先が何を
+    # 受け取るのかが読めず、宛先ボリュームが最初から LUN であるように見える。
     "onprem_ontap": {
-        "ja": "ONTAP\n（NFS データストア）",
-        "en": "ONTAP\n(NFS datastore)",
+        "ja": "ONTAP\n（NFS データストア / VMDK を格納）",
+        "en": "ONTAP\n(NFS datastore holding the VMDKs)",
     },
     "shift_toolkit": {
         "ja": "Shift Toolkit\n（Windows）",
@@ -290,17 +325,23 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Amazon Elastic Block Store\n（ブートディスク）",
         "en": "Amazon Elastic Block Store\n(boot disk)",
     },
+    # アイコンのラベルはサービス名だけ。**以前は「（iSCSI LUN）」を付けていたが、SnapMirror の
+    # 矢印がそこへ入るので「NFS データストアの複製先が LUN」と読めてしまった。** ボリュームの
+    # 2 つの状態は箱として別に描く。
     "fsx_data": {
-        "ja": "Amazon FSx for NetApp ONTAP\n（iSCSI LUN)",
-        "en": "Amazon FSx for NetApp ONTAP\n(iSCSI LUN)",
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    "vol_dp": {
+        "ja": "SnapMirror 宛先ボリューム\n（VMDK のまま）",
+        "en": "SnapMirror destination volume\n(still VMDK)",
+    },
+    "vol_lun": {
+        "ja": "同じボリューム上の iSCSI LUN\n（break 後に VMDK から変換）",
+        "en": "iSCSI LUN in the same volume\n(converted from the VMDK after the break)",
     },
     "e_snapmirror": {"ja": "SnapMirror", "en": "SnapMirror"},
-    # 2 行。オンプレミスの枠は幅 280 で、縦のエッジ（x=160）の右に置ける余地は 140px しか
-    # ない。1 行の JA（約 190px）はどこに置いても枠の右辺か線のどちらかに重なる。
-    "e_flexclone": {
-        "ja": "FlexClone と\nディスク変換",
-        "en": "FlexClone and\ndisk conversion",
-    },
+    "e_boot_ami": {"ja": "AMI からブート", "en": "Boots from the AMI"},
     "e_iscsi_mp": {"ja": "iSCSI マルチパス", "en": "iSCSI multipath"},
     # --- figure 5: iSCSI multipath -------------------------------------------------
     "fsx_multiaz": {
@@ -326,6 +367,54 @@ LABELS: dict[str, dict[str, str]] = {
     # JA の元のラベル（約 230px）はどこに置いてもアイコンか箱に重なる。
     "e_path_active": {"ja": "パス 1（active）", "en": "Path 1 (active)"},
     "e_path_standby": {"ja": "パス 2（standby）", "en": "Path 2 (standby)"},
+    # --- figure 6: migration journey ------------------------------------------------
+    # AWS のサービスは公式のサービス名で書く。短縮形を使うのは AWS 自身が短縮形を正式名と
+    # している Amazon EC2 / Amazon S3 / Amazon DynamoDB だけ。
+    "journey_now": {"ja": "VMware ESXi\n（現在地）", "en": "VMware ESXi\n(today)"},
+    "journey_alt": {
+        "ja": "リホスト以外の選択肢（本検証の範囲外）",
+        "en": "Alternatives to rehosting (outside this verification)",
+    },
+    "journey_evs": {
+        "ja": "Amazon Elastic VMware Service\n（VMware を継続）",
+        "en": "Amazon Elastic VMware Service\n(stay on VMware)",
+    },
+    # Nutanix はサードパーティなので箱。アイコンは AWS のサービスにだけ使う。
+    "journey_nc2": {"ja": "NC2 + ONTAP\n（Nutanix）", "en": "NC2 + ONTAP\n(Nutanix)"},
+    "journey_rosa": {
+        "ja": "Red Hat OpenShift\nService on AWS\n（+ FSx for ONTAP）",
+        "en": "Red Hat OpenShift\nService on AWS\n(+ FSx for ONTAP)",
+    },
+    "phase1": {
+        "ja": "Phase 1: リホスト（本検証の範囲）",
+        "en": "Phase 1: rehost (this verification)",
+    },
+    "phase2": {"ja": "Phase 2: リプラットフォーム", "en": "Phase 2: replatform"},
+    "phase3": {"ja": "Phase 3: リファクタ", "en": "Phase 3: refactor"},
+    "p1_ec2": {"ja": "Amazon EC2", "en": "Amazon EC2"},
+    "p1_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP\n（iSCSI LUN）",
+        "en": "Amazon FSx for NetApp ONTAP\n(iSCSI LUN)",
+    },
+    "p2_ecs": {
+        "ja": "Amazon Elastic\nContainer Service",
+        "en": "Amazon Elastic\nContainer Service",
+    },
+    "p2_eks": {
+        "ja": "Amazon Elastic\nKubernetes Service",
+        "en": "Amazon Elastic\nKubernetes Service",
+    },
+    "p2_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP\n（NFS / iSCSI）",
+        "en": "Amazon FSx for NetApp ONTAP\n(NFS / iSCSI)",
+    },
+    "p3_fargate": {"ja": "AWS Fargate", "en": "AWS Fargate"},
+    "p3_lambda": {"ja": "AWS Lambda", "en": "AWS Lambda"},
+    "p3_s3": {
+        "ja": "Amazon Simple\nStorage Service",
+        "en": "Amazon Simple\nStorage Service",
+    },
+    "p3_dynamodb": {"ja": "Amazon DynamoDB", "en": "Amazon DynamoDB"},
     # --- figure 1 -------------------------------------------------------------------
     "aws_cloud": {"ja": "AWS クラウド（ap-northeast-1）", "en": "AWS Cloud (ap-northeast-1)"},
     "vpc": {"ja": "利用者の Amazon VPC", "en": "Customer Amazon VPC"},
@@ -874,16 +963,27 @@ def _onprem_to_aws() -> Diagram:
     """オンプレミスの VMware から Amazon EC2 + FSx for ONTAP へ。既存 3 図が AWS Transform の
     内側だけを描いているのに対し、この図は**移行元**を含む。
 
-    左に 1 列、右に AWS。オンプレミスの列は上から下へ、vCenter Server → ESXi → 移行元 VM →
-    Shift Toolkit → ONTAP。**Shift Toolkit を移行元 VM と ONTAP の間に置いたのは向きのため
-    だけではない。** 変換を行う位置がそこなので、読む順序と処理の順序が一致する。
+    **SnapMirror が運ぶのは VMDK であって LUN ではない。** 以前の版は SnapMirror の矢印を
+    「Amazon FSx for NetApp ONTAP（iSCSI LUN）」と書いたアイコンへ入れていて、NFS データストアの
+    複製先が LUN であるように読めた。手順書（`docs/ja/shift-toolkit-ec2-procedure.md` の Phase 4）
+    の順序は break が 5、VMDK → LUN 変換が 9 で、変換は FSx for ONTAP 側で break の**後**に
+    起きる。したがって FSx for ONTAP 側には状態が 2 つあり、それを箱 2 つで分けて描く。
 
-    ONTAP から FSx for ONTAP への SnapMirror が図の背骨。FSx for ONTAP を ONTAP より下に
-    置いてあるのは、右へ出て上がると向きの規則を破るため。
+    1. SnapMirror 宛先ボリューム — VMDK のまま。プロトコルで公開しない
+    2. 同じボリューム上の iSCSI LUN — break 後に VMDK から変換したもの
+
+    **この経路で FSx for ONTAP が NFS を提供する場面は無い。** NFS はソース側のデータストア
+    だけで、AWS 側のデータアクセスは iSCSI のみ（同手順書の必要ポート表に 2049 が無く、3260 が
+    ある）。「NFS 用と iSCSI 用を別に描く」ではなく「1 本のボリュームの前後の状態を分けて
+    描く」のが正しい。
+
+    Shift Toolkit を列の**先頭**に置いた。変換を行うのは FSx for ONTAP 側なので、以前のように
+    移行元 VM と ONTAP の間に置いて「FlexClone とディスク変換」を貼ると、変換がオンプレミスで
+    起きるという誤りになる。先頭に置けば「この一連を駆動するもの」として読める。
 
     **VM Import/Export のエッジは引いていない。** ブートディスクだけを Amazon Elastic Block
-    Store へ運ぶ別経路で、移行元 VM から見て EBS は右上にあり、線を引くと上向きになる。1 本
-    落として本文へ移すのは規格が認めている扱いで、代わりにキャプションで触れる。
+    Store へ運ぶ別経路で、移行元 VM から見て EBS は右下だが、経由する S3 と AMI を描くと図が
+    2 倍になる。1 本落として本文へ移すのは規格が認めている扱い。
 
     Shift Toolkit と ONTAP はサードパーティなので箱で表し、公式アイコンは AWS のサービスに
     だけ使う。
@@ -893,74 +993,165 @@ def _onprem_to_aws() -> Diagram:
         diagram_id="atx-fsxn-onprem-to-aws",
         # 既存図と同じ 940。実効サイズは 16 x 880/964 = 14.6px で下限を超える。
         width=940,
-        # 660。FSx for ONTAP のラベルは 2 行あり、アイコン下端 510 から 554 まで伸びる。
-        # 枠を 600 で閉じるのは、**目視で下端をラベルが越えていたため**。ゲートは越境を見ない。
-        height=660,
+        # 740。Amazon EC2 と Amazon Elastic Block Store のラベルが 704 まで伸びる。
+        # **枠の下端はアイコンではなくラベルの下端で決まる。**
+        height=740,
         groups=(
             # オンプレミスを 280、AWS を 575 に振った。**アイコンのラベルは箱と違って幅を
             # 指定できず、サービス名の長さがそのまま必要な間隔になる。**「Amazon Elastic
             # Block Store」は 2 行でも約 200px あり、AWS 側が 395px だと EC2 のラベルと
             # 横に並べられない。箱側のテキストは短いので、幅は箱から取って絵に渡す。
-            Group("onprem", "onprem", 20, 40, 280, 530, gr_icon=None, kind="vpc", dashed=True),
-            Group("aws_cloud", "aws_cloud", 340, 40, 575, 560),
+            Group("onprem", "onprem", 20, 40, 280, 450, gr_icon=None, kind="vpc", dashed=True),
+            Group("aws_cloud", "aws_cloud", 340, 40, 575, 670),
         ),
         boxes=(
-            Box("vcenter", "vcenter", 40, 90, 240, 52),
-            Box("esxi", "esxi", 40, 170, 240, 52),
-            Box("source_vm", "source_vm", 40, 250, 240, 62),
-            Box("shift_toolkit", "shift_toolkit", 40, 340, 240, 52),
-            # 間隔 47px。**2 行のエッジラベルは 44px 必要で、以前の 28px では上下の箱の枠線に
-            # 文字が重なっていた。** 箱の間隔は見た目の余白ではなくラベルの行数で決まる。
-            Box("onprem_ontap", "onprem_ontap", 40, 439, 240, 62),
+            # Shift Toolkit が先頭。**変換は FSx for ONTAP 側で起きるので、これを移行元 VM と
+            # ONTAP の間に置くと変換がオンプレミスで起きるように読める。**
+            Box("shift_toolkit", "shift_toolkit", 40, 85, 240, 52),
+            Box("onprem_vmware", "onprem_vmware", 40, 165, 240, 62),
+            Box("source_vm", "source_vm", 40, 257, 240, 62),
+            # 中心 385。**右の FSx for ONTAP アイコンと同じ高さに置く。** SnapMirror は
+            # 水平の 1 本になり、曲がり角が消えるのでラベルの置き場所が決まる。
+            Box("onprem_ontap", "onprem_ontap", 40, 349, 240, 72),
+            # ボリュームの 2 つの状態。箱の幅 225 に EN のラベルが折り返して 3 行入るので
+            # 高さを 72 / 82 に取っている。
+            Box("vol_dp", "vol_dp", 685, 349, 225, 72),
+            Box("vol_lun", "vol_lun", 685, 460, 225, 82),
         ),
         nodes=(
-            Node("target_ec2", "ec2", "target_ec2_boot", *centred("ec2", 450, 130)),
-            # 中心 760。EC2 のラベル右端（約 510）との間に 150px 空く。**以前は 620 と 780 で
-            # 160px しか離しておらず、2 つのラベルが接していた。** アイコン間の距離ではなく
-            # ラベル幅の合計で決める。
-            Node("ebs_boot", "ebs", "ebs_boot", *centred("ebs", 760, 130)),
-            # Amazon Elastic Block Store の真下。**以前は Amazon EC2 の真下に置いていたが、
-            # そこへ下向きのエッジを引くと線が EC2 自身のラベルを縦に貫く。** アイコンの下は
-            # そのアイコンのラベルの領域なので、下へ抜けるのではなく右へ出て降りる。
-            Node("fsx_data", "fsx_ontap", "fsx_data", *centred("fsx_ontap", 760, 470)),
+            # 中心 560。280（ONTAP の右辺）から 520（アイコンの左辺）までの 240px が
+            # SnapMirror のラベルの置き場で、枠の境界（340）より右に収まる。
+            Node("fsx_data", "fsx_ontap", "fsx_data", *centred("fsx_ontap", 560, 385)),
+            Node("ebs_boot", "ebs", "ebs_boot", *centred("ebs", 470, 620)),
+            Node("target_ec2", "ec2", "target_ec2_boot", *centred("ec2", 760, 620)),
         ),
         edges=(
-            Edge("e_vc_esxi", "vcenter", "esxi", exit_at=(0.5, 1), entry_at=(0.5, 0)),
-            Edge("e_esxi_vm", "esxi", "source_vm", exit_at=(0.5, 1), entry_at=(0.5, 0)),
-            Edge("e_vm_shift", "source_vm", "shift_toolkit", exit_at=(0.5, 1), entry_at=(0.5, 0)),
             Edge(
-                "e_shift_ontap",
+                "e_shift_vmware",
                 "shift_toolkit",
-                "onprem_ontap",
-                "e_flexclone",
+                "onprem_vmware",
                 exit_at=(0.5, 1),
                 entry_at=(0.5, 0),
-                offset=(0, 75, 0),
             ),
-            # ラベルは曲がり角（x=560）の手前に置く。**中点は曲がり角そのもので、そこに置くと
-            # 文字が縦の区間を跨ぐ。** along を負にして源側へ寄せる。
+            Edge("e_vmware_vm", "onprem_vmware", "source_vm", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            Edge("e_vm_ontap", "source_vm", "onprem_ontap", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            # 水平 1 本。ラベルは中点（400）に置き、AWS 側の枠の境界（340）より右になる。
             Edge(
                 "e_sm",
                 "onprem_ontap",
                 "fsx_data",
                 "e_snapmirror",
                 exit_at=(1, 0.5),
-                entry_at=(0, 0.75),
-                points=((560, 470), (560, 490)),
-                offset=(-0.38, 0, -14),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
             ),
-            # 2 本とも Amazon EC2 の右辺から出る。同じ点から出すと重なるので高さを分ける。
-            Edge("e_ec2_ebs", "target_ec2", "ebs_boot", exit_at=(1, 0.35), entry_at=(0, 0.35)),
-            # 入口は 0.25、SnapMirror は 0.75。**同じ辺の同じ点へ 2 本入れると矢頭が重なって
-            # 1 本に見える。** ラベルは縦の区間の右に置く（左は EC2 のラベル、真上は線）。
+            # ファイルシステムから宛先ボリュームへ。含意は「この中にこのボリュームがある」で、
+            # データの流れではない。
+            Edge("e_fsx_vol", "fsx_data", "vol_dp", exit_at=(1, 0.5), entry_at=(0, 0.5)),
+            # 状態の遷移。**ラベルは付けない。** break と変換のことは下の箱のラベルが書いて
+            # いて、線に貼ると縦の区間を跨ぐ。
+            Edge("e_break", "vol_dp", "vol_lun", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            # 2 本とも Amazon EC2 に入る。EBS はブート、LUN はデータ。**矢印の向きは
+            # 「誰が誰に提供するか」で、EC2 が起点ではない。**
             Edge(
-                "e_ec2_fsx",
+                "e_boot",
+                "ebs_boot",
                 "target_ec2",
-                "fsx_data",
+                "e_boot_ami",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+            # ラベルは縦の区間の左。右は Amazon EC2 のアイコンに当たる。
+            Edge(
+                "e_iscsi",
+                "vol_lun",
+                "target_ec2",
                 "e_iscsi_mp",
-                exit_at=(1, 0.75),
-                entry_at=(0, 0.25),
-                offset=(0.0, 80, 0),
+                exit_at=(0.25, 1),
+                entry_at=(0.5, 0),
+                offset=(0.0, -85, 0),
+            ),
+        ),
+    )
+
+
+def _migration_journey() -> Diagram:
+    """リホストから先の段と、リホスト以外の選択肢。
+
+    **この図は検証結果ではない。** Phase 1 だけが本プロジェクトの検証範囲で、Phase 2 / Phase 3
+    と選択肢は整理である。それでも AWS のサービスは公式アイコンと公式サービス名で描く。読者が
+    サービスを取り違える方が、図が構成図に見えることより害が大きい。
+
+    **段の中にエッジを引くのは Phase 1 だけ。** Phase 2 の Amazon ECS と Amazon EKS は互いに
+    代替であって流れではなく、そこへ矢印を引くと「ECS の次が EKS」と読める。段の枠と並びが
+    「この段の構成要素」を表しているので、線は要らない。Phase 1 の Amazon EC2 → FSx for ONTAP
+    だけは実測した経路なので引く。
+
+    選択肢（Amazon EVS / NC2 / ROSA）にもエッジを引かない。**現在地から 3 本引くと、途中の
+    アイコンを線が貫く。** 3 つは流れではなく並列の選択肢なので、破線の枠とタイトルで表す。
+
+    段の進行は枠から枠へのエッジで表す。`check_diagram_flow` は幾何を持つ頂点すべてを端点と
+    して扱うので、枠を端点にしたエッジも向きの検査を受ける。
+    """
+    return Diagram(
+        name="atx-fsxn-migration-journey",
+        diagram_id="atx-fsxn-migration-journey",
+        width=940,
+        # 1090。最下段のラベルが 1024 まで伸びる。**段の高さは 210 で揃える。** 140 に縮めた
+        # ときは枠のタイトルの上にアイコンが重なった（アイコンの中心が枠の上端 + 90 なので、
+        # 高さを削るとタイトルの帯に食い込む）。
+        height=1090,
+        # すべて破線。**実線の枠は AWS の構成（VPC など）に見える。** ここでの枠は段と選択肢
+        # という論理的なまとまりで、AWS のリソース境界ではない。
+        groups=(
+            Group(
+                "journey_alt",
+                "journey_alt",
+                300,
+                60,
+                615,
+                210,
+                gr_icon=None,
+                kind="vpc",
+                dashed=True,
+            ),
+            Group("phase1", "phase1", 30, 350, 885, 210, gr_icon=None, kind="vpc", dashed=True),
+            Group("phase2", "phase2", 30, 600, 885, 210, gr_icon=None, kind="vpc", dashed=True),
+            Group("phase3", "phase3", 30, 850, 885, 210, gr_icon=None, kind="vpc", dashed=True),
+        ),
+        boxes=(
+            Box("journey_now", "journey_now", 30, 100, 220, 62),
+            Box("journey_nc2", "journey_nc2", 590, 120, 150, 62),
+        ),
+        nodes=(
+            Node("journey_evs", "evs", "journey_evs", *centred("evs", 430, 150)),
+            # 3 行のラベル。1 行に収めると約 265px になり、隣の NC2 の箱に触る。
+            Node("journey_rosa", "rosa", "journey_rosa", *centred("rosa", 830, 150)),
+            Node("p1_ec2", "ec2", "p1_ec2", *centred("ec2", 200, 445)),
+            Node("p1_fsx", "fsx_ontap", "p1_fsx", *centred("fsx_ontap", 520, 445)),
+            Node("p2_ecs", "ecs", "p2_ecs", *centred("ecs", 200, 695)),
+            Node("p2_eks", "eks", "p2_eks", *centred("eks", 500, 695)),
+            Node("p2_fsx", "fsx_ontap", "p2_fsx", *centred("fsx_ontap", 800, 695)),
+            Node("p3_fargate", "fargate", "p3_fargate", *centred("fargate", 170, 945)),
+            Node("p3_lambda", "lambda", "p3_lambda", *centred("lambda", 390, 945)),
+            Node("p3_s3", "s3", "p3_s3", *centred("s3", 610, 945)),
+            Node("p3_dynamodb", "dynamodb", "p3_dynamodb", *centred("dynamodb", 830, 945)),
+        ),
+        edges=(
+            # 現在地から Phase 1 の枠へ。入口を 0.15 にしているのは、枠の中心（0.5）に入れると
+            # 選択肢の破線枠の内側を横切るため。
+            Edge("e_now_p1", "journey_now", "phase1", exit_at=(0.5, 1), entry_at=(0.15, 0)),
+            Edge("e_p1_p2", "phase1", "phase2", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            Edge("e_p2_p3", "phase2", "phase3", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            Edge(
+                "e_p1_iscsi",
+                "p1_ec2",
+                "p1_fsx",
+                "e_iscsi_mp",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
             ),
         ),
     )
@@ -1047,6 +1238,7 @@ DIAGRAMS = (
     _finalize(),
     _onprem_to_aws(),
     _iscsi_multipath(),
+    _migration_journey(),
 )
 
 # --- rendering ---------------------------------------------------------------------------
