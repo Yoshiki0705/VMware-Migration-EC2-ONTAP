@@ -41,11 +41,15 @@ DIAGRAM_DIR = ROOT / "docs" / "_assets" / "diagrams"
 IMAGE_DIR = ROOT / "docs" / "_assets" / "images"
 PNG_DIR = IMAGE_DIR / "png"
 
-FIGURES = (
-    "atx-fsxn-data-path",
-    "atx-fsxn-control-path",
-    "atx-fsxn-finalize-flexclone",
-)
+sys.path.insert(0, str(ROOT / "tools"))
+
+# 図の一覧は build_diagrams が持っている。**ここに書き写すと、図を追加した人が
+# この検査に登録し忘れ、成果物が 1 つも無くても「OK」が出る。** 実際に 2 図を追加した
+# 直後の実行が「3 figures」を返していた。import は AWS アイコンパッケージも draw.io も
+# 要らない（アイコンの解決は書き出し時）。
+from build_diagrams import DIAGRAMS  # noqa: E402
+
+FIGURES = tuple(diagram.name for diagram in DIAGRAMS)
 
 SKIP_DIR_PARTS = {".venv", "node_modules", "__pycache__", ".git", ".private"}
 ICON_LIBRARY = re.compile(r"^(Arch_|Res_|Icon-package)")
