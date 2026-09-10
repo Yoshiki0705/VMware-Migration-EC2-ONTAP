@@ -618,7 +618,7 @@ Playbook の evidence tier と本レポートのタグの対応は 2 章に記�
 **移行完了後の撤去が必要である。** Finalize は片付けを完了させない（12.10）。**本検証の撤去は実施済みで、依存関係と所要時間を 13 章に記録した。** 撤去で確認すべき点は 3 つある。
 
 - NLB と VPC エンドポイントサービスは Finalize では消えないため、手作業で削除する（13.1）
-- クラスタスコープの client-ca 証明書は `fsxadmin` では削除できない（13.3）
+- クラスタスコープの client-ca 証明書は削除できない。**ロールの制限ではなく API がサポートしていない**（13.3）
 - ターゲットインスタンスのルート EBS ボリュームは、インスタンスを終了しても残る（13.4）
 
 共用ファイルシステムで実施した点は繰り返し確認しておく。**自動バックアップの無効化はファイルシステム全体に及ぶ**ため、本番相当の検証では専用ファイルシステムを推奨する（5.3）。ARP はボリューム / SVM 単位で制御できるため専用 SVM で隔離できる（5.5）。
@@ -1101,7 +1101,7 @@ igroup の残骸は機能影響を持たないが、同じ SVM を再利用す�
 | 6 | ターゲット FlexVol | **FSx API** `fsx delete-volume` | **70 秒**。内部の LUN 2 本も一緒に削除された |
 | 7 | SVM | **FSx API** `fsx delete-storage-virtual-machine` | **100 秒**。igroup とルートボリュームも一緒に削除された |
 | 8 | ONTAP の `security login` | REST `DELETE /api/security/accounts/{owner-uuid}/{name}` | 即時 |
-| 9 | ONTAP の client-ca 証明書 | — | **削除できなかった**（14.3） |
+| 9 | ONTAP の client-ca 証明書 | — | **削除できなかった**（13.3） |
 | 10 | レプリケーションテンプレート | `storageType` を `EBS` へ戻す | 即時 |
 | 11 | 起動テンプレート、シークレット、セキュリティグループ、IAM ロール / プロファイル | 各 API | 即時。シークレットのみ 7 日の復旧期間 |
 | 12 | ターゲットのルート EBS ボリューム | `delete-volume` | 即時（14.4） |
@@ -1114,14 +1114,18 @@ igroup の残骸は機能影響を持たないが、同じ SVM を再利用す�
 
 ただし igroup は FSx API に対応する概念が無く、SVM を残す場合は ONTAP REST で個別に削除する必要がある。
 
-### 13.3 `fsxadmin` では削除できない証明書
+### 13.3 直接削除がサポートされていない証明書
 
-`security login` は削除できたが、**client-ca 証明書の削除は `fsxadmin` の権限では拒否された**。
+`security login` は削除できたが、**client-ca 証明書の削除は拒否された**。
 
 | 試した経路 | 結果 |
 |---|---|
 | REST `DELETE /api/security/certificates/{uuid}` | **403** `not authorized for that command`（code 6） |
 | private CLI パススルー `DELETE /api/private/cli/security/certificate?...` | **403** 同じ |
+
+**当初この節は原因を「`fsxadmin` の権限」と書いていた。帰属を訂正する。** ONTAP REST の [`DELETE /security/certificates` のエラー一覧](https://docs.netapp.com/us-en/ontap-restapi/delete-security-certificates-.html#error)に `Deleting this client_ca certificate directly is not supported.` と記載がある。**client_ca 証明書の直接削除は API としてサポートされていない。**
+
+観測した文言は `not authorized for that command` なので、ロール由来の拒否と API 由来の非サポートを実測で分離したわけではない。**分離する必要もない。** どちらであっても、**「権限の強いロールを使えば消せる」という回避策は存在しない**（FSx for ONTAP で使えるロールにこの操作を許可するものは無い）。ロールを探す時間は使わなくてよい。
 
 `security login` の削除方法にも注意点がある。`?application=http` を付けると **400** `Unexpected argument "application"` になる。クエリパラメータ無しの `DELETE /api/security/accounts/{owner-uuid}/{name}` が正しい。
 
@@ -1201,6 +1205,10 @@ igroup の残骸は機能影響を持たないが、同じ SVM を再利用す�
 - [Run high-performance workloads with Amazon FSx for NetApp ONTAP（EVS ユーザーガイド）](https://docs.aws.amazon.com/evs/latest/userguide/fsx-ontap.html)
 - [What's New: Amazon EVS now integrates with Amazon FSx for NetApp ONTAP](https://aws.amazon.com/about-aws/whats-new/2025/06/amazon-elastic-vmware-service-fsx-netapp-ontap/) — public preview 記載
 - [Using Amazon Elastic VMware Service with FSx for ONTAP（FSx ユーザーガイド）](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/evs-ontap.html)
+
+### NetApp ONTAP
+
+- [ONTAP REST API: `DELETE /security/certificates`](https://docs.netapp.com/us-en/ontap-restapi/delete-security-certificates-.html#error) — エラー一覧に `Deleting this client_ca certificate directly is not supported.`（13.3 の帰属の出典）
 
 ### 関連リポジトリ
 

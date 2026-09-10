@@ -207,7 +207,11 @@ curl -s -k -o /dev/null -w '%{http_code}\n' https://127.0.0.1:8443/api/cluster  
 
 > **スコープの注意**: 公式手順の `vserver_name` はファイルシステム ID 形式（`FsxId...`）の**管理 vserver**を指す。データ SVM ではない。したがって共用ファイルシステムでは**クラスタスコープの認証追加**になる。追加のみで既存の認証は変更しない。秘密鍵を持たない者に権限は渡らない。
 >
-> **撤去は完全には戻せない（実測）**: `security login` は `fsxadmin` で削除できるが、**client-ca 証明書の削除は `fsxadmin` では 403 `not authorized for that command` になる**（REST の `DELETE /api/security/certificates/{uuid}` と private CLI パススルーの両方で拒否。ONTAP 9.18.1P3D1 で実測）。ログインを削除した時点で証明書認証は 403 で拒否されるため**アクセスは確実に失効する**が、証明書そのものは無効な残骸として残る。共用ファイルシステムに恒久的な残留物を作りたくない場合は、この点を事前に合意しておく。
+> **撤去は完全には戻せない（実測 + 公開ドキュメント）**: `security login` は `fsxadmin` で削除できるが、**client-ca 証明書の削除は `fsxadmin` では 403 `not authorized for that command` になる**（REST の `DELETE /api/security/certificates/{uuid}` と private CLI パススルーの両方で拒否。ONTAP 9.18.1P3D1 で実測）。ログインを削除した時点で証明書認証は 403 で拒否されるため**アクセスは確実に失効する**が、証明書そのものは無効な残骸として残る。共用ファイルシステムに恒久的な残留物を作りたくない場合は、この点を事前に合意しておく。
+>
+> **これはロールの制限ではなく API の制限である。** ONTAP REST の [`DELETE /security/certificates`](https://docs.netapp.com/us-en/ontap-restapi/delete-security-certificates-.html#error) のエラー一覧に `Deleting this client_ca certificate directly is not supported.` と記載がある。**したがって「権限の強いロールを使えば消せる」という回避策は存在しない。** 上の 403 は `fsxadmin` で観測した文言であり、ロール由来の拒否と API 由来の非サポートを実測で分離したわけではないが、**分離する必要がない**。FSx for ONTAP で使えるロールに、この操作を許可するものは無い。
+>
+> 改善要望（`fsxadmin` で作れるものは `fsxadmin` で消せるようにしてほしい）と、ATX の FSx for ONTAP 設定手順への記載要望は、いずれも AWS サポートへ起票済み。**提出は公開ではないため、記載されるまでは未記載の挙動として扱う。**
 >
 > 作成した SVM には独自の管理 LIF が付くため、SVM スコープの `security login` で足りる可能性はあるが**未検証**（検証レポートの U14）。公式手順から外れると失敗時の切り分けが難しくなる。
 
