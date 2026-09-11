@@ -2,7 +2,7 @@
 
 **Purpose**: Establish the scope of Amazon FSx for NetApp ONTAP support GA in AWS Transform (ATX) from primary sources, and record hands-on findings from a verification account (ap-northeast-1) with verified and unverified claims kept separate.
 
-**Last Updated**: 2026-09-04
+**Last Updated**: 2026-09-11 (documentation-state claims re-checked; the measurements remain those of 2026-09-04)
 **Status**: Measured from scope confirmation through initialization, certificate authentication, saving the configuration, running replication, launching a test instance, and checking data integrity, and **Finalize was run with approval** (12.10). Teardown complete (Section 13)
 
 ---
@@ -156,7 +156,7 @@ The console steps and screens are split out into the [MGN console procedure](./a
 | 4 | Secret ARN candidates | **No filtering.** All 23 secrets in the Region are listed, including untagged ones |
 | 5 | Required-field validation | Saving with the fields blank is rejected on three: SVM ID, Secret ARN, and **additional security groups** |
 
-**Validation strength differs between the console and the API.** As noted in 4.4, the API accepts a non-existent secret ARN, whereas the console rejects on all three required fields. Furthermore, that additional security groups become required is not evident from the procedure text in the MGN User Guide; it surfaces only in the console.
+**Validation strength differs between the console and the API.** As noted in 4.4, the API accepts a non-existent secret ARN, whereas the console rejects on all three required fields. Furthermore, that an additional security group is **required** is not evident from the MGN User Guide. The procedure does tell you to choose a security group (Step 5, item 7), but it does not say that saving is rejected without one; the requirement surfaces only in the console.
 
 When configuring through IaC or the CLI, **the existence and contents of the secret ARN must be validated yourself**. A successful configuration API call is not evidence that the integration works. The console validates whether the required fields are populated, but **not the secret's tag or its contents** (see the correction in 4.5).
 
@@ -381,7 +381,7 @@ To the question "if an EC2/EBS source is not possible, which capability is it wa
 
 ### 7.1 Result of searching public documentation [Unverified]
 
-As of 2026-09-04, the following were searched for a minimum ONTAP version and **none was found**.
+As of 2026-09-04, the following were searched for a minimum ONTAP version and **none was found**. Both the FSx for ONTAP configuration page and the troubleshooting page were re-read in full on 2026-09-11 (20,994 and 12,676 characters respectively) and the statement is still absent.
 
 - [FSx for ONTAP configuration (MGN User Guide)](https://docs.aws.amazon.com/mgn/latest/ug/fsx-ontap.html) — Prerequisites and Known limitations
 - [MGN Release notes](https://docs.aws.amazon.com/mgn/latest/ug/mgn-release-notes.html)
@@ -586,14 +586,14 @@ The mapping between the Playbook evidence tiers and this report's tags is given 
 | U3 | Elapsed times | **Resolved** (12.1, 12.9) | Initial full sync 226s. With the correct sequence, the MGN job took 649s and 817s elapsed from T0 to boot confirmation. A single measurement; other configurations not measured |
 | U4 | Real behaviour of LUN / volume conversion | **Resolved** (12.3, 12.4, 12.9) | One parent volume plus a LUN per disk, the FlexClone, two igroups, and two multipath devices all measured. Timestamps map the SNAPSHOT phase to a volume Snapshot and the LAUNCH phase to FlexClone creation |
 | U5 | Real behaviour of post-migration optimization via `lun move start` | Unverified | U2 is resolved, but `lun move` after migration was not run here. Straight after migration every LUN of one server sits in a single volume (12.3), so this is needed when recovery granularity has to be separated |
-| U6 | Minimum ONTAP version requirement | Unverified | No statement found in public documentation (searched 2026-09-04) |
+| U6 | Minimum ONTAP version requirement | Unverified | No statement found in public documentation (searched 2026-09-04, re-read in full 2026-09-11) |
 | U7 | GA status of EVS + FSx for ONTAP | Unverified | No GA announcement found (searched 2026-09-04) |
 | U8 | Correspondence between `SETUP_FSX_PROXY` and automatic PrivateLink establishment | **Resolved** (12.2) | Creation of an NLB and a VPC endpoint service measured, with `mgn.amazonaws.com` as the allowed principal |
 | U9 | Root cause of the `initialize-service` (CLI) failure | **Resolved** | Not a defect. The API path expects 8 IAM roles to be created first and they were not. CloudTrail in us-east-1 records the `AddRoleToInstanceProfile` `NoSuchEntityException` (5.4) |
 | U10 | Whether MGN initialization succeeds from the console | **Resolved** (5.4) | Succeeded. 9 roles created, including the 2 FSx-specific ones |
 | U11 | Actual SSD usage on the candidate file system | **Resolved** (5.6) | Aggregate 861.8 GiB, 50.0 GiB used, 5.8% utilization |
 | U12 | Completing the template save (committing the FSx for ONTAP configuration) | **Resolved** (4.6) | Certificate authentication verified with a negative control, and the save confirmed by API read-back |
-| U13 | Official documentation of the additional-security-group requirement | Unverified | Seen only in the console validation message and on-screen help. No corresponding statement found in the MGN User Guide procedure text (searched 2026-09-04) |
+| U13 | Official documentation that an additional security group is **required** | Unverified | As of 2026-09-11 the procedure does instruct choosing a security group (Step 5, item 7). There is no statement that **saving is rejected without one**, so the requirement surfaces only in the console validation message (searched 2026-09-04, re-checked 2026-09-11) |
 | U14 | Whether the certificate and login can be scoped to an SVM | **Untested (future work)** | The created SVM has its own management LIF so it might work, but the official procedure specifies the admin vserver, and departing from it makes failures hard to triage. Cluster scope is now confirmed working, so there is a baseline to compare against |
 | U15 | ONTAP version requirement for running replication | **Resolved** (section 12) | Replication and test launch both succeeded on 9.18.1P3D1. No version-related problem arose |
 | U16 | Real behaviour of Finalize (the FlexClone split) | **Resolved** (12.10) | Run with approval. Split starts about 3 minutes in and finishes in under 60s (7.93 GiB); staging is deleted about 13 minutes in. **Non-disruptive**, with data matching. No job record is created |
@@ -603,7 +603,7 @@ The mapping between the Playbook evidence tiers and this report's tags is given 
 | U20 | Whether cutover succeeds after correcting the disk assignment | **Resolved** (12.9) | Re-onboarding produced a consistent assignment, and both boot and data integrity succeeded, confirming the 12.8 diagnosis |
 | U21 | How to make MGN re-evaluate a stale disk assignment | **Resolved** (2026-09-09) | `update-replication-configuration` cannot repair it (three contradictory errors; `isBootDisk` is read-only). **The documented route is rerunning the installer**: [step 6 of the agent installation](https://docs.aws.amazon.com/mgn/latest/ug/linux-agent.html) names it as the way to restore a replicated-disk list that no longer matches the machine. Deleting the source server is not needed; the delete-and-re-onboard used here was the heaviest option available. Whether `stagingDiskType` is re-derived as well is not settled by that text and is unverified |
 | U17 | Billing impact of the NLB | Not calculated (**persistence now known**) | The NLB persists **beyond Finalize, not just for the duration of replication** (12.10), and requires manual teardown. No statement was found in public documentation and the cost was not estimated |
-| U23 | Official documentation that Finalize leaves the NLB and VPC endpoint service | Unverified | Measured: not deleted through T0 + 36 min (12.10). The EBS volumes are deleted after about 33 minutes. No statement found in public documentation (searched 2026-09-04) |
+| U23 | Official documentation that Finalize leaves the NLB and VPC endpoint service | Unverified | Measured: not deleted through T0 + 36 min (12.10). The EBS volumes are deleted after about 33 minutes. No statement found in public documentation (searched 2026-09-04, re-read in full 2026-09-11) |
 
 ### 11.2 Candidate next actions
 
@@ -656,7 +656,7 @@ Section 4.3 established the step's existence from the API model and inferred it 
 
 The MGN service therefore reaches the ONTAP REST API (443) over PrivateLink, through an NLB in the customer's VPC. The design avoids exposing the management endpoint externally.
 
-**Cost implication**: an **NLB runs in the customer's account for the duration of replication**, incurring NLB hourly and LCU charges. No statement of this was found in the AWS documentation or blog consulted (searched 2026-09-04). It belongs in a migration cost estimate.
+**Cost implication**: an **NLB runs in the customer's account for the duration of replication**, incurring NLB hourly and LCU charges. No statement of this was found in the AWS documentation or blog consulted (searched 2026-09-04, re-read in full 2026-09-11). It belongs in a migration cost estimate.
 
 ### 12.3 Measured storage layout
 
@@ -1079,7 +1079,7 @@ Resources remain after Finalize, and **they keep billing**.
 | igroup `replication-<source server ID>` | Remains with 0 LUN maps | ONTAP-side residue |
 | Target FlexVol, its two LUNs, and igroup `target-<ID>` | In service | The migration target itself. **Keeping it is correct**; removal belongs after the migration is judged complete |
 
-**The EBS volumes do get deleted (after about 33 minutes). The NLB and the VPC endpoint service do not.** The FSx proxy MGN created keeps billing after the migration completes, so **manual teardown is required**. No statement about this residue was found in public documentation (searched 2026-09-04).
+**The EBS volumes do get deleted (after about 33 minutes). The NLB and the VPC endpoint service do not.** The FSx proxy MGN created keeps billing after the migration completes, so **manual teardown is required**. No statement about this residue was found in public documentation (searched 2026-09-04, re-read in full 2026-09-11).
 
 The leftover igroup has no functional effect, but it is confusing if the same SVM is reused.
 
