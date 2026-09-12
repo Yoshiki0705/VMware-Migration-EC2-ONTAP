@@ -131,6 +131,21 @@ diagram-fonts: ## 図のラベルが可読性の下限を満たすか（実効�
 diagram-flow: ## 図が右向き・下向きだけで読めるか（ラベルはアイコンの下、枠のタイトルは角）
 	$(PYTHON) tools/check_diagram_flow.py --selftest >/dev/null
 	$(PYTHON) tools/check_diagram_flow.py
+.PHONY: draft-parity
+# .private は gitignore なので CI の JA/EN 検査が届かない。**同じ漏れを 3 回踏んだので
+# 手作業の数え上げを検査にした。** ドラフトが無いクローンではスキップする。
+draft-parity: ## ブログ下書きの JA/EN が構造的に一致しているか（ローカル専用）
+	$(PYTHON) tools/check_draft_parity.py --selftest >/dev/null
+	$(PYTHON) tools/check_draft_parity.py
+
+.PHONY: outgoing-probes
+# 引用した他リポジトリの主張が言い換えられていないか。**姉妹側の incoming-probes は
+# Adoption Playbook 1 本にしか繋がっていないので、こちらの保護はこちら側にしか無い。**
+# チェックアウトが無ければスキップするが、スキップは合格ではない。
+outgoing-probes: ## 姉妹リポジトリから引用した主張が生きているか（チェックアウトが無ければスキップ）
+	$(PYTHON) tools/check_outgoing_probes.py --selftest >/dev/null
+	$(PYTHON) tools/check_outgoing_probes.py
+
 .PHONY: diagrams
 diagrams: ## 図を再生成し SVG / PNG を書き出す（AWS アイコンパッケージと draw.io が必要）
 	$(PYTHON) tools/build_diagrams.py --write --export
@@ -140,7 +155,7 @@ diagrams-check: ## committed の図が spec と一致するか（AWS アイコ�
 	$(PYTHON) tools/build_diagrams.py --check
 
 .PHONY: drift
-drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow ## 逆戻り検出（設定の到達性 + 常時ロード予算 + 図の成果物 + ラベルの可読性と向き）
+drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow outgoing-probes draft-parity ## 逆戻り検出（設定の到達性 + 常時ロード予算 + 図の成果物 + ラベルの可読性と向き）
 
 .PHONY: gates
 # **どこでも走る集合**。~/.kiro を要求する agent-config、システムバイナリの shellcheck、
@@ -151,7 +166,7 @@ drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow ## 
 # 以前は Makefile のコメントが「diagram-fonts / diagram-flow は CI で常時走らせる」と
 # 書いているのに ci.yml が drift を呼んでおらず、3 つの図の検査が一度も CI で走って
 # いなかった。集合を 2 か所に書くと、片方だけが更新される。
-gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow ## どこでも走る検査（CI とフックが呼ぶ）
+gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow outgoing-probes ## どこでも走る検査（CI とフックが呼ぶ）
 
 .PHONY: ci
 ci: gates agent-config ## CI が呼ぶ集約ターゲット（gates + ~/.kiro 依存の到達性検査）

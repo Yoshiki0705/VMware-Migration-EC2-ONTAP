@@ -84,6 +84,19 @@ jobs:
       - name: Diagram reading direction
         run: make diagram-flow
 
+      # 引用した主張が姉妹リポジトリで言い換えられていないか。**チェックアウトが無いと
+      # 検査器はスキップするので、ここで隣に置く。** スキップは合格ではない。
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Yoshiki0705/S3-Burst-on-ONTAP-Files
+          path: siblings/S3-Burst-on-ONTAP-Files
+          persist-credentials: false
+
+      - name: Cited claims in sibling repositories
+        env:
+          SIBLING_ROOT: siblings
+        run: make outgoing-probes
+
   shellcheck:
     name: Shell script lint
     runs-on: ubuntu-latest

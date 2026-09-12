@@ -1,0 +1,62 @@
+# Probe strings this repository registers against sibling repositories.
+#
+# Format: <repo>\t<cited path>\t<role>\t<probe>, sorted. One line per cited string. The probe is the
+# last field and is taken whole, so it may contain anything except a tab. `#` starts a comment only at
+# the beginning of a line.
+#
+# Matching the format S3-Burst-on-ONTAP-Files and FSx-for-ONTAP-Adoption-Playbook publish, so a
+# reader written for one works for all three.
+#
+# Verified by `make outgoing-probes`, which reads each cited repository and fails when a registered
+# string is gone. Hand-maintained: a probe is a *chosen* claim-bearing substring, and there is
+# nothing to derive it from.
+#
+# role:
+#   retraction  Expected to survive. Its absence means the claim moved or was retracted, and a claim
+#               here has lost its evidence. Fails.
+#   reread      Expected to move, because it pins a value over a set that grows. Warns.
+#
+# WHY THIS FILE IS NOT ENOUGH ON ITS OWN.
+#
+# S3-Burst-on-ONTAP-Files has the mirror check (`make incoming-probes`), which reads a sibling's
+# contract and fails when this repository's cited string is reworded there. **It is wired to one
+# sibling only** -- `CHECKOUT_NAMES` and `RAW_CONTRACT` in its `tools/check_incoming_probes.py`
+# name FSx-for-ONTAP-Adoption-Playbook. So publishing this file does not make that gate cover us,
+# and assuming it does would be a protection that exists only on paper.
+#
+# Which is why `make outgoing-probes` here reads their repository directly. **The protection this
+# side needs is on this side.** Their gate moving the discovery to the commit that causes it is
+# better, and it has been raised with them, but this file does not depend on that happening.
+#
+# TWO LIMITS, DOCUMENTED BY THE OWNER OF THESE STRINGS AND COPIED HERE BECAUSE THEY APPLY EQUALLY:
+#
+#   1. A probe passes when the string survives anywhere in the file, not where the claim is. A probe
+#      on a string that appears several times is weaker than one on a unique string. Every probe
+#      below was checked to occur exactly once at the pinned commit.
+#   2. A surviving string only says the sentence still exists. A claim retracted but kept as history
+#      keeps its probe green. **Registration is a floor, not a substitute for reading.**
+#
+# Line breaks matter: a probe spanning one never matches. `上限は 1 フローの容量ではない` was
+# rejected as a candidate for exactly that reason and the two strings around it registered instead.
+#
+# ---------------------------------------------------------------------------------------------------
+# S3-Burst-on-ONTAP-Files
+#
+# Read at f27363ce8d1d7c7a5eaac4a6472c44af19dd8aa4. Their F-1 (iSCSI, raw device) is measured; F-2
+# (NVMe/TCP) and F-3 (cache-resident) are not.
+#
+# One claim of theirs is restated in this repository rather than pointed at: that deriving a session
+# count by dividing required bandwidth by 625 MBps does not hold. It appears in the blog draft for
+# part 1 and in docs/images/architecture.md, and it is the reason the sentence there no longer
+# implies such a derivation is written down somewhere here.
+#
+# Five probes. The fourth carries an *absence* -- that the cause of the single flow exceeding 5 Gbps
+# is not established. If that absence stops being true they will have found the cause, which is
+# progress, and it is the case where this side most needs to reread rather than keep citing an
+# unexplained number. The fifth is the restriction that keeps the citation honest: their figures are
+# raw-device, and this project puts a filesystem on the LUN.
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 → 2 では逐次スループットが 1 バイトも動かない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	この算術は両方向に外れる
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	なぜかは確認していない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	セッション数を帯域の割り算で決める形そのものが成立していない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	ファイルシステムを載せた場合の値ではない
