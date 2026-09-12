@@ -2,7 +2,7 @@
 
 **Purpose**: Migration procedure for rehosting VMware workloads to Amazon EC2 using AWS Transform (an agentic AI migration service), with block data placed on Amazon FSx for NetApp ONTAP.
 
-> ⚠️ **Public Preview / as of 2026-06**. The capability to target FSx for ONTAP as a migration destination is in Public Preview. Supported regions, UI, and constraints are subject to change. Do not treat as GA specification. Primary sources: [What's New](https://aws.amazon.com/jp/about-aws/whats-new/2026/06/aws-transform-vmware-fsx-for-ontap-preview/) / [AWS Transform pricing](https://aws.amazon.com/transform/pricing/)
+> ✅ **GA / 30 August 2026**. The capability to target FSx for ONTAP as a migration destination is now GA. [(Primary source: What's New)](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/) Hands-on results are in [the GA verification report](atx-fsxn-ga-verification.md). **This procedure was written during Public Preview (2026-06), so the UI and its labels may have changed since GA.** Do not treat as GA specification. Primary sources: [What's New](https://aws.amazon.com/jp/about-aws/whats-new/2026/06/aws-transform-vmware-fsx-for-ontap-preview/) / [AWS Transform pricing](https://aws.amazon.com/transform/pricing/)
 
 ---
 
@@ -100,7 +100,7 @@ Flow based on official documentation ([UserGuide: Migrate servers](https://docs.
 │  [Step 4] Data replication                                         │
 │    - Continuous block replication to AWS (EBS staging area)         │
 │    - FSx for ONTAP destination: block data replicated directly     │
-│      (Public Preview — no intermediate storage required)           │
+│      (GA 30 Aug 2026 — no intermediate storage required)           │
 │                                                                    │
 │  [Step 5] Testing                                                  │
 │    - Test instance launch → validation                             │
@@ -163,7 +163,7 @@ The MGN Connector connects to source VMs, so SSH keys and passwords are stored i
 >
 > **Production recommendation**: Use certificates issued by an internal CA instead of self-signed. Distributing WinRM HTTPS listeners via Group Policy is efficient for large-scale environments.
 
-### 3.3 Storage Replication to FSx for ONTAP Destination (Public Preview)
+### 3.3 Storage Replication to FSx for ONTAP Destination
 
 > **What's New (2026-06-16)**: "AWS Transform replicates block storage data directly to FSx for ONTAP volumes as part of the same migration wave that handles compute and network, eliminating the need for intermediate storage platforms, separate migration tools, and the additional cost and risk they introduce."
 
@@ -191,7 +191,7 @@ The MGN Connector connects to source VMs, so SSH keys and passwords are stored i
 
 AWS Transform for VMware is [available in 16 regions](https://aws.amazon.com/blogs/migration-and-modernization/accelerating-vmware-migration-aws-transforms-new-experience/) (as of 2026-06).
 
-> **Tokyo region (ap-northeast-1) status**: AWS Transform for VMware's core features are available in the Tokyo region. However, **whether the FSx for ONTAP destination feature (Public Preview) is available in Tokyo is unconfirmed**. Preview feature regional rollout is phased, so verify by checking the console or confirming via an AWS SA.
+> **Tokyo region (ap-northeast-1) status**: AWS Transform for VMware's core features are available in the Tokyo region. However, **whether the FSx for ONTAP destination feature is available in Tokyo is unconfirmed**. Preview feature regional rollout is phased, so verify by checking the console or confirming via an AWS SA.
 >
 > **How to verify**: Log in to the AWS Transform console (https://console.aws.amazon.com/transform/) and check whether the "FSx for ONTAP" option appears in the storage destination selection when creating a VMware migration job.
 
@@ -259,7 +259,7 @@ Q1: Are source VMs on an ONTAP NFS datastore?
 | **Cost (tooling)** | Free (VMware migration) | Free |
 | **ONTAP operational continuity** | To be verified (SnapMirror lineage continuity unclear) | SnapMirror break → FSx for ONTAP native thereafter |
 | **Network transformation** | AI auto-generated (vSwitch → VPC/SG) | Manual (Network Mapping via Blueprint) |
-| **Maturity** | GA (core features) + FSx for ONTAP destination in Public Preview | Early Preview |
+| **Maturity** | GA (core features) + FSx for ONTAP destination also GA (30 Aug 2026) | Early Preview |
 
 ### Combination Patterns (Not Mutually Exclusive)
 
@@ -287,7 +287,7 @@ Pattern C: AWS Transform (planning + network) + Shift Toolkit (storage conversio
 | Cutover downtime | Final sync only (**estimate**: minutes to ~10 min) | 30 min – 2.5 hours (dominated by S3 upload + import-image) |
 | Future improvement | — | Significant reduction expected with EBS Direct API |
 
-> **⚠️ distinction discipline**: AWS Transform's cutover time of "minutes to ~10 min" is an **unmeasured estimate** as it is in Public Preview. Shift Toolkit's "30 min – 2.5 hours" is calculated from the official procedure flow (pre-validation). Both will be updated to confirmed values after hands-on testing.
+> **⚠️ distinction discipline**: AWS Transform's cutover time of "minutes to ~10 min" was an **unmeasured estimate at the time this procedure was written (2026-06)**. Measurements taken after GA are in [the verification report](atx-fsxn-ga-verification.md). Shift Toolkit's "30 min – 2.5 hours" is calculated from the official procedure flow (pre-validation). Both will be updated to confirmed values after hands-on testing.
 
 ### Migration Cost Structure
 
@@ -449,7 +449,7 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 
 ---
 
-*This procedure is a verification draft based on Public Preview (as of 2026-06). It will be updated to confirmed information after hands-on validation.*
+*This procedure is a verification draft written during Public Preview (as of 2026-06). The FSx for ONTAP destination reached GA on 30 August 2026; measurements taken after GA are in [the verification report](atx-fsxn-ga-verification.md).*
 
 ---
 
@@ -467,7 +467,7 @@ Operated the AWS Transform console (Tokyo region: ap-northeast-1) on 2026-06-25 
 | Migration process | Explained in 4 steps: 1. Assessment → 2. Planning → 3. Execution → 4. Validation |
 | Job creation | VMware Migration jobs can be created to begin assessment and planning phases |
 
-> **Important correction**: AWS Transform's VMware → EC2 migration is a **production feature (GA)**. Only the FSx for ONTAP destination for storage migration is Public Preview. Since the former MGN (Application Migration Service) was integrated and evolved into Transform, EBS-target rehosting is a mature capability with a long history.
+> **Important correction**: AWS Transform's VMware → EC2 migration is a **production feature (GA)**. The FSx for ONTAP destination for storage migration also reached GA on 30 August 2026. Since the former MGN (Application Migration Service) was integrated and evolved into Transform, EBS-target rehosting is a mature capability with a long history.
 
 ### 8.2 AWS Transform and Former MGN Relationship
 
@@ -475,7 +475,7 @@ Operated the AWS Transform console (Tokyo region: ap-northeast-1) on 2026-06-25 
 |--------|-------------|
 | Name evolution | AWS Server Migration Service → AWS MGN (Application Migration Service) → **Integrated into AWS Transform** |
 | EBS-target migration | Mature feature existing since the MGN era. Production-ready |
-| FSx for ONTAP-target migration | New capability added as Public Preview in 2026-06 |
+| FSx for ONTAP-target migration | Added as Public Preview in 2026-06; GA on 30 Aug 2026 |
 | UI/UX | Evolved from traditional console → **Agentic AI (chat-based)**. Job creation and management via conversational interface |
 
 ### 8.3 Current Constraints / Items Under Investigation

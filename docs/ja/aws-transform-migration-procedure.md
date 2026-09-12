@@ -2,7 +2,7 @@
 
 **目的**: AWS Transform（エージェント型 AI の移行サービス）を用いて、VMware ワークロードを Amazon EC2 へリホストし、ブロックデータを Amazon FSx for NetApp ONTAP へ配置する移行手順。
 
-> ⚠️ **Public Preview / 2026-06 時点**。FSx for ONTAP を移行先とする機能は Public Preview。対応リージョン・UI・制約は変更されうる。GA 仕様としては扱わない。一次情報: [What's New](https://aws.amazon.com/jp/about-aws/whats-new/2026/06/aws-transform-vmware-fsx-for-ontap-preview/) / [AWS Transform pricing](https://aws.amazon.com/transform/pricing/)
+> ✅ **GA / 2026-08-30**。FSx for ONTAP を移行先とする機能は GA した。[（一次情報: What's New）](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/) 実機検証の結果は [AWS Transform の FSx for ONTAP 対応 GA 検証](atx-fsxn-ga-verification.md) にある。**本手順書は Public Preview 期（2026-06）に書いたもので、UI とラベルは GA 後に変わっている可能性がある。**一次情報: 一次情報: [What's New](https://aws.amazon.com/jp/about-aws/whats-new/2026/06/aws-transform-vmware-fsx-for-ontap-preview/) / [AWS Transform pricing](https://aws.amazon.com/transform/pricing/)
 
 ---
 
@@ -100,7 +100,7 @@
 │  [Step 4] Data replication                                         │
 │    - Continuous block replication to AWS (EBS staging area)         │
 │    - FSx for ONTAP 宛先: ブロックデータを直接レプリケート          │
-│      (Public Preview — intermediate storage 不要)                  │
+│      (GA 2026-08-30 — intermediate storage 不要)                   │
 │                                                                    │
 │  [Step 5] Testing                                                  │
 │    - Test instance launch → validation                             │
@@ -163,7 +163,7 @@ MGN Connector はソース VM に接続するため、SSH 鍵やパスワード�
 >
 > **本番向け**: 自己署名ではなく内部 CA 発行の証明書を使用。グループポリシーで WinRM HTTPS リスナーを一括配布すると大規模環境で効率的。
 
-### 3.3 FSx for ONTAP 宛先のストレージレプリケーション（Public Preview）
+### 3.3 FSx for ONTAP 宛先のストレージレプリケーション
 
 > **What's New（2026-06-16）**: "AWS Transform replicates block storage data directly to FSx for ONTAP volumes as part of the same migration wave that handles compute and network, eliminating the need for intermediate storage platforms, separate migration tools, and the additional cost and risk they introduce."
 
@@ -191,7 +191,7 @@ MGN Connector はソース VM に接続するため、SSH 鍵やパスワード�
 
 AWS Transform for VMware は [16 リージョンで利用可能](https://aws.amazon.com/blogs/migration-and-modernization/accelerating-vmware-migration-aws-transforms-new-experience/)（2026-06 時点）。
 
-> **東京リージョン（ap-northeast-1）の対応状況**: AWS Transform for VMware の基本機能は東京リージョンで利用可能。ただし **FSx for ONTAP 宛先機能（Public Preview）が東京で利用可能かは未確認**。Preview 機能のリージョン展開は段階的であるため、実際にコンソールで確認するか、AWS SA 経由で確認すること。
+> **東京リージョン（ap-northeast-1）の対応状況**: AWS Transform for VMware の基本機能は東京リージョンで利用可能。ただし **FSx for ONTAP 宛先機能が東京で利用可能かは未確認**。GA 後の対応リージョンも未確認のため、実際にコンソールで確認すること。
 >
 > **確認方法**: AWS Transform コンソール（https://console.aws.amazon.com/transform/）にログインし、VMware migration ジョブ作成時のストレージ宛先選択で「FSx for ONTAP」オプションが表示されるかを確認。
 
@@ -259,7 +259,7 @@ Q1: ソース VM は ONTAP NFS データストア上にあるか?
 | **コスト（ツール）** | 無料（VMware migration） | 無料 |
 | **ONTAP 運用継続性** | 要確認（SnapMirror 系譜の引き継ぎ可否が不明） | SnapMirror break 後に FSx for ONTAP ネイティブ |
 | **ネットワーク変換** | AI 自動生成（vSwitch → VPC/SG） | 手動（Blueprint で Network Mapping） |
-| **成熟度** | GA（基本機能）+ FSx for ONTAP 宛先は Public Preview | Early Preview |
+| **成熟度** | GA（基本機能）+ FSx for ONTAP 宛先も GA（2026-08-30） | Early Preview |
 
 ### 組み合わせパターン（非排他）
 
@@ -287,7 +287,7 @@ Q1: ソース VM は ONTAP NFS データストア上にあるか?
 | カットオーバー停止時間 | 最終同期のみ（**推定**: 分〜10分程度） | 30 分〜2.5 時間（S3 upload + import-image が支配的） |
 | 将来の改善 | — | EBS Direct API で大幅短縮見込み |
 
-> **⚠️ distinction discipline**: AWS Transform のカットオーバー時間「分〜10分程度」は Public Preview のため**未実測の推定値**。Shift Toolkit の「30分〜2.5時間」は公式手順書のフローから計算した見積もり（実機検証前）。両方とも実機検証で確定値に更新する。
+> **⚠️ distinction discipline**: AWS Transform のカットオーバー時間「分〜10分程度」は**本手順書の作成時点（2026-06）では未実測の推定値**。GA 後の実測は [検証レポート](atx-fsxn-ga-verification.md) にある。Shift Toolkit の「30分〜2.5時間」は公式手順書のフローから計算した見積もり（実機検証前）。両方とも実機検証で確定値に更新する。
 
 ### 移行中のコスト構造
 
@@ -449,7 +449,7 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 
 ---
 
-*本手順は Public Preview（2026-06 時点）に基づく検証用ドラフト。実機確認後に確定情報へ更新する。*
+*本手順は Public Preview 期（2026-06 時点）に書いた検証用ドラフト。FSx for ONTAP 宛先は 2026-08-30 に GA しており、GA 後の実測は [検証レポート](atx-fsxn-ga-verification.md) にある。*
 
 ---
 
@@ -467,7 +467,7 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 | 移行プロセス説明 | 1. 評価 → 2. 計画 → 3. 実行 → 4. 検証、の 4 ステップ |
 | ジョブ作成 | VMware Migration ジョブを新規作成し、評価と計画フェーズを開始可能 |
 
-> **重要な訂正**: AWS Transform の VMware → EC2 移行は**本番機能（GA）**。FSx for ONTAP 宛先のストレージ移行のみが Public Preview。旧 MGN（Application Migration Service）が Transform に統合・進化したため、EBS 向けリホストは歴史のある成熟した機能。
+> **重要な訂正**: AWS Transform の VMware → EC2 移行は**本番機能（GA）**。FSx for ONTAP 宛先のストレージ移行も 2026-08-30 に GA した。旧 MGN（Application Migration Service）が Transform に統合・進化したため、EBS 向けリホストは歴史のある成熟した機能。
 
 ### 8.2 AWS Transform と旧 MGN の関係整理
 
@@ -475,7 +475,7 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 |------|------|
 | 名称変遷 | AWS Server Migration Service → AWS MGN (Application Migration Service) → **AWS Transform に統合** |
 | EBS 向け移行 | 旧 MGN 時代から存在する成熟機能。本番利用可能 |
-| FSx for ONTAP 向け移行 | 2026-06 に Public Preview として追加された新機能 |
+| FSx for ONTAP 向け移行 | 2026-06 に Public Preview で追加され、2026-08-30 に GA |
 | UI/UX | 従来のコンソール型 → **Agentic AI（チャット型）に進化**。ジョブ作成・管理が対話形式 |
 
 ### 8.3 現時点の制約・確認中事項

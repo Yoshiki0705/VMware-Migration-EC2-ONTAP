@@ -2,7 +2,7 @@
 
 このページは本プロジェクトの構成図とフローを 1 か所に集めたものです。
 
-**最終更新**: 2026-07-17
+**最終更新**: 2026-09-12
 
 ---
 
@@ -87,6 +87,36 @@ NC2（Nutanix）だけ箱で描いてあるのはサードパーティの製品�
 
 ---
 
+## 移行の選択肢とデータ層の可搬性
+
+この 2 枚は検証結果ではなく整理です。**それでも AWS のサービスは公式アイコンと公式サービス名で描いています。** 読者がサービスを取り違える方が、整理の図が構成図に見えることより害が大きいためです。
+
+![AWS が公式に示す VMware ワークロードの 5 つのパスウェイを 5 段に並べた図。1 段目は Amazon EC2 への移行、2 段目は AWS 上でのモダナイゼーション、3 段目は AWS 上での VMware 継続、4 段目はオンプレミスでの AWS 実行、5 段目は AWS 上でのサードパーティハイパーバイザー。](../_assets/images/atx-fsxn-vmware-pathways.svg)
+
+図 7: AWS が公式に示す 5 つのパスウェイ。**どの段でも Amazon FSx for NetApp ONTAP をデータ層に置けることを位置で示しています。** 段の間に線を引いていないのは、5 つが順序ではなく選択肢だからです。
+
+移行ツール（AWS Transform / AWS Application Migration Service / Cirrus Migrate Cloud / Shift Toolkit）は図に入れていません。4 つ足すと 1 段が 2 行になり、図の主題がツールの一覧に移ります。ツールの選び方は [移行方式比較](../ja/migration-method-comparison.md) にあります。
+
+![左がオンプレミス、右が AWS。オンプレミス側はハイパーバイザーがデータストアとして NetApp ONTAP（FAS / AFF）を使い、AWS 側は Amazon EC2 が Amazon FSx for NetApp ONTAP を使う。両者は SnapMirror で双方向につながる。](../_assets/images/atx-fsxn-ontap-portability.svg)
+
+図 8: 上がコンピュート、下がデータ層。**コンピュートを変えてもデータ層は同じで、境界をまたぐのは SnapMirror だけです。** オンプレミス側の枠は AWS 公式の Corporate data center バッジで、紫の破線（VPC の色）は使っていません。
+
+---
+
+## マルチプロトコルと FlexClone の仕組み
+
+![左に VMware ESXi、Microsoft Hyper-V、Amazon EC2 が縦に並び、右の 1 つの ONTAP ボリュームの中にある VMDK、VHDX、iSCSI LUN へそれぞれ NFS、SMB、iSCSI で到達する。](../_assets/images/atx-fsxn-multiprotocol-volume.svg)
+
+図 9: 1 つのボリュームの中に 3 つの表現があり、3 つのプロトコルで同時に読めます。**箱を 3 つに分けたのは、収束先を 1 つにすると入口が足りないから**です（直交ルーティングが 1 ノードに与える入口は左と上の 2 レーンだけ）。この図に AWS Cloud の枠が無いのは、Amazon EC2 と VMware ESXi / Hyper-V が同じ列に並ぶため、枠を 1 つ置くと Amazon EC2 が枠の外に出てしまうからです。
+
+![Amazon FSx for NetApp ONTAP の同一ボリューム内で、オリジナル（VMDK）から FlexClone（変換後 / iSCSI LUN）がメタデータのみで作られ、両方が同じ共有された物理ブロックを指す。](../_assets/images/atx-fsxn-flexclone-blocks.svg)
+
+図 10: クローンとオリジナルは同じ物理ブロックを共有します。図 5（Finalize でのライフサイクル）とは別の図で、**あちらは時間の経過、こちらは静的な構造**です。クローン直後の追加物理消費 35.5 MiB（論理 7.91 GiB に対して）は AWS Transform の検証で測った値です。
+
+ONTAP の Snapshot / FlexClone / LUN に AWS パッケージのアイコンは無いので箱で描いています。Amazon EBS の Snapshot アイコンを借りると、ONTAP の機構を Amazon EBS のものとして示すことになります。
+
+---
+
 ## 方式選定の分岐
 
 分岐の根拠、各方式の制約、実測ダウンタイムは [移行方式比較](../ja/migration-method-comparison.md) にあります。**そちらが判断の基準で、この図はその要約です。**
@@ -120,7 +150,7 @@ flowchart TD
     style ATX_ANY fill:#FF9900,color:#000,stroke:#8a5200
 ```
 
-図 7: 4 方式の分岐。AWS Transform は移行元を問わないため 2 か所に現れます。**葉には方式名しか入れていません。** 成熟度（AWS Transform の FSx for ONTAP 宛先は Public Preview、Shift Toolkit は Early Preview）と各方式の制約は比較表にあり、図に入れると横幅が 2 倍になって縮小時に読めなくなります。
+図 11: 4 方式の分岐。AWS Transform は移行元を問わないため 2 か所に現れます。**葉には方式名しか入れていません。** 成熟度（AWS Transform の FSx for ONTAP 宛先は 2026 年 8 月 30 日に GA、Shift Toolkit の EC2 対応は Early Preview）と各方式の制約は比較表にあり、図に入れると横幅が 2 倍になって縮小時に読めなくなります。
 
 どの方式も排他ではなく、VM 特性ごとに使い分ける前提です（[組み合わせパターン](../ja/migration-method-comparison.md#6-組み合わせパターン)）。
 

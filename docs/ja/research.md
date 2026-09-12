@@ -4,6 +4,8 @@
 **著者ポジション**: Amazon FSx for NetApp ONTAP 担当 / AWS Community Builder  
 **ステータス**: 調査フェーズ（Early Preview 検証前）
 
+> ⚠️ **本文は 2026-06-03 時点のスナップショットです。** 以降、AWS Transform の FSx for ONTAP 宛先は **2026-08-30 に GA** しました。本文中の「Public Preview」の記述は 当時のものです。[（GA の一次情報）](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/) GA 後の実機検証は [検証レポート](atx-fsxn-ga-verification.md) にあります。
+
 ---
 
 ## 1. エグゼクティブサマリー

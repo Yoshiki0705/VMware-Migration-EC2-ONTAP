@@ -13,7 +13,7 @@
 | ビジネススポンサー | ________________ |
 | 技術リード（顧客側） | ________________ |
 | 技術リード（パートナー側） | ________________ |
-| 使用ツール | □ Shift Toolkit (Early Preview) □ AWS Transform (Public Preview) □ CMC □ MGN |
+| 使用ツール | □ Shift Toolkit (Early Preview) □ AWS Transform (GA) □ CMC □ MGN |
 | 検証シナリオ | □ 移行 (Migration) □ DR (継続レプリケーション＋復旧) |
 
 ### 顧客の最初の質問
@@ -66,7 +66,7 @@ Q2: データディスクを FSx for ONTAP (iSCSI) に配置したいか?
 
 Q3: 移行の進め方は?
     AWS ネイティブで一気通貫（計画〜コンピュート〜ストレージ）/ ソース混在
-        → AWS Transform（VMware 移行は無料・FSx for ONTAP 宛先は Public Preview）
+        → AWS Transform（VMware 移行は無料・FSx for ONTAP 宛先は 2026-08-30 に GA）
           手順: docs/ja/aws-transform-migration-procedure.md
     ONTAP FlexClone での高速変換・中小規模 / PoC
         → Shift Toolkit (Early Preview) ← 本テンプレート主対象

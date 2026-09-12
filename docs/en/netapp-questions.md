@@ -1,6 +1,6 @@
 # NetApp Confirmation Items — VMware → EC2 / FSx for ONTAP Migration
 
-> Purpose: Confirm migration paths based on Shift Toolkit (Early Preview) and AWS Transform (Public Preview).
+> Purpose: Confirm migration paths based on Shift Toolkit (Early Preview) and AWS Transform (FSx for ONTAP destination reached GA on 30 August 2026).
 > All items are technical questions based on publicly available information; no customer-specific
 > details, company names, or internal identifiers are included.
 

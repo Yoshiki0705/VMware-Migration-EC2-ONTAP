@@ -23,7 +23,7 @@
 | Aspect | Shift Toolkit | AWS Transform | VM Import/Export | Veeam Restore to EC2 |
 |--------|--------------|---------------|-----------------|---------------------|
 | **Primary use case** | Migrate VMware VMs to EC2 + FSx for ONTAP | AWS-native migration planning & execution (discovery → cutover) | Convert VM images to AMI | Restore from backups to EC2 |
-| **FSx for ONTAP utilization** | ◎ Strong. Data disks placed directly as iSCSI LUNs | ○ FSx for ONTAP destination in Public Preview (2026-06) | △ Primarily EBS. FSx for ONTAP requires separate design | △ Primarily EBS. FSx for ONTAP requires separate design |
+| **FSx for ONTAP utilization** | ◎ Strong. Data disks placed directly as iSCSI LUNs | ◎ FSx for ONTAP destination is GA (30 Aug 2026). Data disks placed directly as iSCSI LUNs | △ Primarily EBS. FSx for ONTAP requires separate design | △ Primarily EBS. FSx for ONTAP requires separate design |
 | **Boot disk** | EBS (VMDK → RAW → S3 → AMI) | EBS (MGN agent handles automatically) | EBS (AMI via import-image) | EBS (Veeam handles EC2 conversion) |
 | **Data disk** | FSx for ONTAP iSCSI LUN (FlexClone-based) | EBS or FSx for ONTAP (Preview) | Primarily EBS | Primarily EBS. FSx for ONTAP requires separate design |
 | **Source environment prerequisite** | VMs on ONTAP NFS datastore **required** | Any VMware environment (ONTAP not required) | Any (as long as VMDK/OVA can be exported) | VMs backed up by Veeam |
@@ -32,7 +32,7 @@
 | **Large VM suitability** | Expected improvement in 8.1 (EBS Direct API) | High (continuous replication minimizes size impact) | Low (time increases proportionally with S3 upload + import) | Depends on Repository bandwidth |
 | **OS restrictions** | See Shift Toolkit support matrix (partially VM Import dependent) | See MGN support matrix | [Many restrictions](https://docs.aws.amazon.com/vm-import/latest/userguide/prerequisites.html) (EOL OS, P2V, i386 unsupported, etc.) | Possibly VM Import dependent (to be confirmed) |
 | **Operability** | Dedicated GUI (Blueprint-based) | Agentic AI (chat-based UI) + console | CLI-centric (aws ec2 import-image) | Veeam GUI (Restore to EC2 wizard) |
-| **Maturity** | Early Preview (EC2 migration path) | GA (EBS target) / Public Preview (FSx for ONTAP target) | GA (long history) | GA (familiar to Veeam users) |
+| **Maturity** | Early Preview (EC2 migration path) | GA (both EBS and FSx for ONTAP targets) | GA (long history) | GA (familiar to Veeam users) |
 | **Tool cost** | Free | Free (VMware migration agent) | Free | Veeam license required |
 | **Network transformation** | Manual (Network Mapping via Blueprint) | AI auto-generated (vSwitch → VPC/SG mapping) | Manual | Manual |
 | **ONTAP operational continuity** | ◎ Native ONTAP features (Snapshot/SnapMirror/Efficiency) continue after SnapMirror break | △ To be verified (Snapshot lineage continuity unclear) | ✕ Treated as new volume | ✕ Treated as new volume |
@@ -138,7 +138,7 @@ EC2 launch:                        15.1sec
 
 **Considerations:**
 
-- FSx for ONTAP destination is Public Preview (constraints and GA timeline unconfirmed)
+- The FSx for ONTAP destination reached GA on 30 August 2026. The boot disk is always Amazon EBS
 - ONTAP Snapshot lineage continuity unclear (likely created as new LUN/volume)
 - Replication agent installation required on source VMs
 - Staging EBS costs during continuous replication
