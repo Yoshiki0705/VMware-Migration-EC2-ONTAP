@@ -276,7 +276,7 @@ Additional error details:
 | SCP による拒否 | 当該アカウントは Organizations の管理アカウントであり、SCP は管理アカウントに適用されない |
 | IAM クォータ超過 | ロール 452 / 1000、インスタンスプロファイル 40 / 1000 |
 | 既存リソースとの名前衝突 | 同名のロールは存在しない |
-| CloudTrail 上の IAM エラー | ~~当該時刻の IAM イベントはいずれのリージョンにも現れない~~ → **この確認が誤り。** us-east-1 に記録されている（下記の訂正を参照）。当時の照会は時刻範囲を取り違えていた可能性が高い。CloudTrail の出力はローカル時刻で表示される一方、`--start-time` / `--end-time` は UTC で解釈される |
+| CloudTrail 上の IAM エラー | ~~当該時刻の IAM イベントはいずれのリージョンにも現れない~~ → **この確認が誤り。** us-east-1 に記録されている（下記の訂正を参照）。**取りこぼしやすい条件が 2 つある。** IAM はグローバルサービスなので記録先は us-east-1 のみで、作業リージョン（`ap-northeast-1`）を見ても 0 件になる。加えてこれらのイベントは `userIdentity.invokedBy` が `mgn.amazonaws.com` で記録されるため、**自分のプリンシパルを条件に絞ると一致しない**（2026-09-12 実測）。当時どちらで外したかは特定できていない |
 
 エージェント型レプリケーションはこれらのインスタンスプロファイルとロールを必要とするため、**この失敗が解消しない限り E2E 検証には進めない**。テンプレート設定（4.4）は初期化を必要としないため実測できた。
 
@@ -299,6 +299,16 @@ CloudTrail（us-east-1、IAM はグローバルサービスのためここに記
 |---|---|---|
 | CLI（2026-09-03 20:31 UTC、失敗） | **0 回** | `CreateServiceLinkedRole` → `CreateInstanceProfile` × 4 → `AddRoleToInstanceProfile` × 4 が全て `NoSuchEntityException`（`The role with name AWSApplicationMigration...Role cannot be found.`） |
 | コンソール（2026-09-04 06:13 UTC、成功） | **8 回** | ロールを作成したうえでプロファイルへ紐付け |
+
+同じ記録に到達するための照会条件を残す。**リージョンは us-east-1 で、絞り込みはイベント名で行う**（2026-09-12 実測）。
+
+```bash
+aws cloudtrail lookup-events --region us-east-1 \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=AddRoleToInstanceProfile \
+  --start-time 2026-09-03T00:00:00Z --end-time 2026-09-06T00:00:00Z
+```
+
+**呼び出し元で絞ると出てこない。** 返るイベントの `userIdentity.invokedBy` は `mgn.amazonaws.com` で、サービスが利用者に代わって実行した IAM 操作として記録される。`errorCode` は `NoSuchEntityException`、`errorMessage` は `The role with name <ロール名> cannot be found.` である。再試行した回数だけ同じ列が並ぶため、失敗が繰り返されたことも記録から数えられる。
 
 `initialize-service` はロールを作ろうとしていない。存在しないロールをプロファイルへ紐付けようとして失敗している。これは [API での初期化手順](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html) の記述と一致する。
 

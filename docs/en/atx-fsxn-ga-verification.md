@@ -276,7 +276,7 @@ Factors ruled out during triage:
 | SCP denial | This is the Organizations management account, and SCPs do not apply to it |
 | IAM quota exhaustion | 452 / 1000 roles, 40 / 1000 instance profiles |
 | Name collision with existing resources | No roles of those names exist |
-| IAM errors in CloudTrail | ~~No IAM events for that window appear in either region~~ → **this check was wrong.** They are in us-east-1 (see the correction below). The lookup at the time most likely used the wrong window: CloudTrail renders timestamps in local time while `--start-time` / `--end-time` are read as UTC |
+| IAM errors in CloudTrail | ~~No IAM events for that window appear in either region~~ → **this check was wrong.** They are in us-east-1 (see the correction below). **Two conditions make them easy to miss.** IAM is a global service, so us-east-1 is the only region that holds them and the working region (`ap-northeast-1`) returns nothing. On top of that these events carry `userIdentity.invokedBy` = `mgn.amazonaws.com`, so **filtering on your own principal never matches** (measured 2026-09-12). Which of the two the original lookup hit is not determined |
 
 Agent-based replication requires these instance profiles and roles, so **E2E verification cannot proceed until this failure is resolved**. Template configuration (4.4) does not require initialization, which is why it could be measured.
 
@@ -299,6 +299,16 @@ CloudTrail in us-east-1 — IAM is a global service, so its events land there �
 |---|---|---|
 | CLI (2026-09-03 20:31 UTC, failed) | **0** | `CreateServiceLinkedRole` → `CreateInstanceProfile` × 4 → `AddRoleToInstanceProfile` × 4, all four with `NoSuchEntityException` (`The role with name AWSApplicationMigration...Role cannot be found.`) |
 | Console (2026-09-04 06:13 UTC, succeeded) | **8** | Roles created, then attached to the profiles |
+
+The lookup that reaches the same records, for anyone debugging this failure. **Query us-east-1 and filter by event name** (measured 2026-09-12).
+
+```bash
+aws cloudtrail lookup-events --region us-east-1 \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=AddRoleToInstanceProfile \
+  --start-time 2026-09-03T00:00:00Z --end-time 2026-09-06T00:00:00Z
+```
+
+**Filtering by caller returns nothing.** Each event carries `userIdentity.invokedBy` = `mgn.amazonaws.com`, recorded as an IAM call the service made on the account's behalf. `errorCode` is `NoSuchEntityException` and `errorMessage` is `The role with name <role> cannot be found.` The sequence repeats once per retry, so the number of failed attempts is countable from the records alone.
 
 `initialize-service` never attempts to create a role. It fails attaching roles that do not exist, which matches [the API initialization page](https://docs.aws.amazon.com/mgn/latest/ug/mgn-initialize-api.html):
 
