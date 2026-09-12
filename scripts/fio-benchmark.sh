@@ -11,6 +11,19 @@
 #
 # WARNING: This script writes directly to the block device. ALL DATA WILL BE LOST.
 #          Only use on dedicated test LUNs with no production data.
+#
+# WARNING: A thin-provisioned LUN returns zeros for blocks that were never written, without
+#          reaching disk. Measuring reads before a full write pass measures nothing. Write the
+#          whole device once first.
+#
+# MEASUREMENT TOOL: fio. The perf-matrix figures in the sibling repository
+#          S3-Burst-on-ONTAP-Files are measured with VDBENCH 5.04.07 directly, so the two sets
+#          cannot be placed in the same table -- the measurement tool differs. If they need to be
+#          compared, switch this side to VDBENCH rather than converting the numbers.
+#
+#          That repository's block measurements (iSCSI and NVMe/TCP, patterns F-1 to F-3) are
+#          planned and NOT YET RUN, so there is nothing to compare against yet either:
+#          docs/ja/verification/block-protocol-matrix-plan.md
 # ==============================================================================
 
 set -euo pipefail
