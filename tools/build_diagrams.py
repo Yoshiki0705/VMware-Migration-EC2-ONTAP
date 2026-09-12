@@ -119,6 +119,18 @@ ICONS = {
     "pcs": (
         "Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Parallel-Computing-Service_64.svg"
     ),
+    # 公式パスウェイの図で使う。**MGN と略さない。** パッケージのファイル名が
+    # `Arch_AWS-Application-Migration-Service_64.svg` なので、サービス名はこれが正。
+    "mgn": (
+        "Architecture-Service-Icons_{d}/Arch_Migration-Modernization/64/"
+        "Arch_AWS-Application-Migration-Service_64.svg"
+    ),
+    # rack / servers / family の 3 つが同梱されている。**どれか 1 つを選ぶのではなく、
+    # 製品の系列全体を指すのが family。** パスウェイの図はどの形態かを問わないので family。
+    "outposts": ("Architecture-Service-Icons_{d}/Arch_Compute/64/Arch_AWS-Outposts-family_64.svg"),
+    "workspaces": (
+        "Architecture-Service-Icons_{d}/Arch_End-User-Computing/64/Arch_Amazon-WorkSpaces_64.svg"
+    ),
     # リソースアイコン（48px）。アクセスポイントはサービスではなく、ファイルシステムの前に
     # 置く入口なので、サービスアイコンではなくこちらを使う。Light / Dark の別ファイルは無い。
     "s3_ap": (
@@ -159,6 +171,9 @@ ICON_SIZE = {
     "lambda": 80,
     "batch": 80,
     "pcs": 80,
+    "mgn": 80,
+    "outposts": 80,
+    "workspaces": 80,
     "deadline": 80,
     "cloudfront": 80,
     "transfer_family": 80,
@@ -580,6 +595,147 @@ LABELS: dict[str, dict[str, str]] = {
     "phase_snapshot": {"ja": "SNAPSHOT フェーズ", "en": "SNAPSHOT phase"},
     "phase_launch": {"ja": "LAUNCH フェーズ", "en": "LAUNCH phase"},
     "phase_finalize": {"ja": "Finalize", "en": "Finalize"},
+    # --- figure 7: the five official VMware pathways ---------------------------------
+    # 段のタイトルは AWS の公式ページの並び。**番号は AWS 側の並び順で、優劣ではない。**
+    "pw1": {
+        "ja": "1. Amazon EC2 への移行（リホスト）",
+        "en": "1. Migrate to Amazon EC2 (rehost)",
+    },
+    "pw2": {
+        "ja": "2. AWS 上でのモダナイゼーション",
+        "en": "2. Modernize on AWS",
+    },
+    "pw3": {
+        "ja": "3. AWS 上での VMware 継続",
+        "en": "3. Run VMware on AWS",
+    },
+    "pw4": {
+        "ja": "4. オンプレミスでの AWS 実行",
+        "en": "4. Run AWS on-premises",
+    },
+    "pw5": {
+        "ja": "5. AWS 上でのサードパーティハイパーバイザー",
+        "en": "5. Run third-party hypervisors on AWS",
+    },
+    "pw_ec2": {"ja": "Amazon EC2", "en": "Amazon EC2"},
+    "pw_fsx1": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    "pw_ecs": {
+        "ja": "Amazon Elastic\nContainer Service",
+        "en": "Amazon Elastic\nContainer Service",
+    },
+    "pw_eks": {
+        "ja": "Amazon Elastic\nKubernetes Service",
+        "en": "Amazon Elastic\nKubernetes Service",
+    },
+    "pw_fargate": {"ja": "AWS Fargate", "en": "AWS Fargate"},
+    "pw_workspaces": {"ja": "Amazon WorkSpaces", "en": "Amazon WorkSpaces"},
+    "pw_lambda": {"ja": "AWS Lambda", "en": "AWS Lambda"},
+    "pw_batch": {"ja": "AWS Batch", "en": "AWS Batch"},
+    "pw_fsx2": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    "pw_evs": {
+        "ja": "Amazon Elastic\nVMware Service",
+        "en": "Amazon Elastic\nVMware Service",
+    },
+    "pw_fsx3": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    "pw_outposts": {"ja": "AWS Outposts", "en": "AWS Outposts"},
+    "pw_rosa": {
+        "ja": "Red Hat OpenShift\nService on AWS",
+        "en": "Red Hat OpenShift\nService on AWS",
+    },
+    # サードパーティ製品なので箱。AWS / Amazon の接頭辞の規則は AWS のサービスにだけ効く。
+    "pw_nc2": {
+        "ja": "Nutanix Cloud Clusters\non AWS",
+        "en": "Nutanix Cloud Clusters\non AWS",
+    },
+    "e_pw_iscsi": {"ja": "iSCSI", "en": "iSCSI"},
+    "e_pw_nfs": {"ja": "NFS / SMB", "en": "NFS / SMB"},
+    # --- figure 8: ONTAP as the portable data layer ----------------------------------
+    "pt_onprem": {"ja": "オンプレミス", "en": "On-premises"},
+    "pt_aws": {"ja": "AWS", "en": "AWS"},
+    "pt_hv": {
+        "ja": "ハイパーバイザー\n（VMware ESXi / Nutanix AHV / Hyper-V）",
+        "en": "Hypervisor\n(VMware ESXi / Nutanix AHV / Hyper-V)",
+    },
+    "pt_ontap": {
+        "ja": "NetApp ONTAP（FAS / AFF）\nVMDK / VHDX / LUN を格納",
+        "en": "NetApp ONTAP (FAS / AFF)\nholds the VMDK / VHDX / LUN",
+    },
+    "pt_ec2": {"ja": "Amazon EC2", "en": "Amazon EC2"},
+    "pt_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    "pt_common": {
+        "ja": "どちらでも同じ: Snapshot / FlexClone / SnapMirror / Storage Efficiency",
+        "en": "Same on both sides: Snapshot / FlexClone / SnapMirror / Storage Efficiency",
+    },
+    "e_pt_hv": {"ja": "データストア", "en": "Datastore"},
+    "e_pt_snapmirror": {"ja": "SnapMirror", "en": "SnapMirror"},
+    # --- figure 9: one volume, three protocols ---------------------------------------
+    "mp_esxi": {
+        "ja": "VMware ESXi\n（NFS データストア）",
+        "en": "VMware ESXi\n(NFS datastore)",
+    },
+    "mp_hyperv": {"ja": "Microsoft Hyper-V", "en": "Microsoft Hyper-V"},
+    "mp_ec2": {"ja": "Amazon EC2", "en": "Amazon EC2"},
+    "mp_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    # 枠のタイトル。**「データは同じ場所にありアクセス方法だけが変わる」は本文に置く。**
+    # 図の中で最も文字数の多い部分は、画像がカラム幅に縮小されたとき最初に読めなくなる。
+    "mp_volume": {
+        "ja": "ONTAP ボリューム /vol/vm_data",
+        "en": "ONTAP volume /vol/vm_data",
+    },
+    "mp_vmdk": {"ja": "VMDK", "en": "VMDK"},
+    "mp_vhdx": {"ja": "VHDX", "en": "VHDX"},
+    "mp_lun": {"ja": "iSCSI LUN", "en": "iSCSI LUN"},
+    "e_mp_nfs": {"ja": "NFS", "en": "NFS"},
+    "e_mp_smb": {"ja": "SMB", "en": "SMB"},
+    "e_mp_iscsi": {"ja": "iSCSI", "en": "iSCSI"},
+    # --- figure 10: FlexClone block sharing ------------------------------------------
+    "fc_volume": {"ja": "同一ボリューム内", "en": "Within the same volume"},
+    "fc_fsx": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
+    },
+    "fc_orig": {
+        "ja": "オリジナル\n（VMDK）",
+        "en": "Original\n(VMDK)",
+    },
+    "fc_clone": {
+        "ja": "FlexClone\n（変換後 / iSCSI LUN）",
+        "en": "FlexClone\n(converted / iSCSI LUN)",
+    },
+    # **「ほぼゼロ」と書かない。** 実測がある値は実測を書く。35.5 MiB は blog-03 と同じ
+    # 検証で測った、8 GiB のボリュームをクローンした直後の物理消費。
+    "fc_shared": {
+        "ja": (
+            "共有された物理ブロック\n"
+            "クローン直後の追加物理消費は 35.5 MiB（論理 7.91 GiB に対して）"
+        ),
+        "en": (
+            "Shared physical blocks\n"
+            "35.5 MiB of additional physical use right after the clone "
+            "(against 7.91 GiB logical)"
+        ),
+    },
+    # 箱の間隔（120px）に収まる長さ。**「作成はメタデータ操作だけ」は約 192px あり、
+    # 隣の箱に食い込む。** 意味は保ったまま短くしている。
+    "e_fc_create": {
+        "ja": "メタデータのみ",
+        "en": "Metadata only",
+    },
 }
 
 
@@ -1310,6 +1466,293 @@ def _iscsi_multipath() -> Diagram:
     )
 
 
+def _vmware_pathways() -> Diagram:
+    """AWS が公式に示している 5 つのパスウェイと、それぞれのデータ層。
+
+    **段は選択肢であって順序ではない。** だから段の間にエッジを引かない。1 から 5 の番号は
+    AWS の公式ページの並びで、優劣ではない。
+
+    **エッジを引くのは、そのパスウェイでデータ層への経路が実測または明記されている段だけ。**
+    パスウェイ 1 の Amazon EC2 → FSx for ONTAP は本プロジェクトで測った経路、パスウェイ 3 の
+    Amazon EVS → FSx for ONTAP は NFS / SMB のデータストアとして公式に示されている経路。
+    パスウェイ 2 の 6 つは互いに代替なので線を引くと「ECS の次が EKS」と読める。
+
+    移行ツール（AWS Transform / AWS Application Migration Service / Cirrus Migrate Cloud /
+    Shift Toolkit）は図に入れない。**4 つ足すと 1 段が 2 行になり、図の主題がツールの一覧に
+    移る。** ツール名は本文の表にある。
+    """
+    return Diagram(
+        name="atx-fsxn-vmware-pathways",
+        diagram_id="atx-fsxn-vmware-pathways",
+        width=940,
+        height=1410,
+        # すべて破線。**実線は AWS のリソース境界（VPC など）に見える。** ここでの枠は
+        # 「選択肢のまとまり」で、境界ではない。
+        groups=(
+            Group("pw1", "pw1", 25, 30, 890, 210, gr_icon=None, kind="vpc", dashed=True),
+            # 2 行。6 つを 1 行に置くと Amazon Elastic Container Service と Amazon Elastic
+            # Kubernetes Service のラベルが接する。上の行をコンピュート、下の行を実行基盤と
+            # データ層にする。
+            Group("pw2", "pw2", 25, 280, 890, 350, gr_icon=None, kind="vpc", dashed=True),
+            Group("pw3", "pw3", 25, 670, 890, 210, gr_icon=None, kind="vpc", dashed=True),
+            Group("pw4", "pw4", 25, 920, 890, 210, gr_icon=None, kind="vpc", dashed=True),
+            Group("pw5", "pw5", 25, 1170, 890, 210, gr_icon=None, kind="vpc", dashed=True),
+        ),
+        boxes=(
+            # Nutanix はサードパーティなので箱。AWS / Amazon の接頭辞の規則は AWS の
+            # サービスにだけ効く。
+            Box("pw_nc2", "pw_nc2", 380, 1235, 280, 62),
+        ),
+        nodes=(
+            Node("pw_ec2", "ec2", "pw_ec2", *centred("ec2", 150, 125)),
+            Node("pw_fsx1", "fsx_ontap", "pw_fsx1", *centred("fsx_ontap", 470, 125)),
+            # **中心はラベルの幅から決める。** 等間隔に置くと幅の広いラベルの隣で必ず接する。
+            Node("pw_ecs", "ecs", "pw_ecs", *centred("ecs", 130, 370)),
+            Node("pw_eks", "eks", "pw_eks", *centred("eks", 320, 370)),
+            Node("pw_fargate", "fargate", "pw_fargate", *centred("fargate", 500, 370)),
+            Node("pw_workspaces", "workspaces", "pw_workspaces", *centred("workspaces", 700, 370)),
+            Node("pw_lambda", "lambda", "pw_lambda", *centred("lambda", 140, 520)),
+            Node("pw_batch", "batch", "pw_batch", *centred("batch", 330, 520)),
+            Node("pw_fsx2", "fsx_ontap", "pw_fsx2", *centred("fsx_ontap", 580, 520)),
+            Node("pw_evs", "evs", "pw_evs", *centred("evs", 160, 765)),
+            Node("pw_fsx3", "fsx_ontap", "pw_fsx3", *centred("fsx_ontap", 470, 765)),
+            Node("pw_outposts", "outposts", "pw_outposts", *centred("outposts", 160, 1015)),
+            Node("pw_rosa", "rosa", "pw_rosa", *centred("rosa", 170, 1265)),
+        ),
+        edges=(
+            Edge(
+                "e_pw1",
+                "pw_ec2",
+                "pw_fsx1",
+                "e_pw_iscsi",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+            Edge(
+                "e_pw3",
+                "pw_evs",
+                "pw_fsx3",
+                "e_pw_nfs",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+        ),
+    )
+
+
+def _ontap_portability() -> Diagram:
+    """ONTAP がハイパーバイザーとクラウドの選択に依存しないこと。
+
+    **左がオンプレミス、右が AWS。** 上がコンピュート、下がデータ層。この 2 軸にしたのは、
+    記事の主張が「コンピュートを変えてもデータ層は同じ」だからで、図の構造が主張と一致する。
+
+    Amazon EVS / ROSA / NC2 はこの図に入れない。**パスウェイの図（図 7）に入っているので、
+    ここに再掲すると同じサービスの集合が 2 枚に散る。** ここで示すのは軸であって選択肢の
+    一覧ではない。
+
+    SnapMirror は 1 本のエッジに両矢印。行きと戻りを 2 本描くと、戻りが左向きになる。
+    """
+    return Diagram(
+        name="atx-fsxn-ontap-portability",
+        diagram_id="atx-fsxn-ontap-portability",
+        width=940,
+        height=580,
+        groups=(
+            # **バッジの名前は `group_corporate_data_center`。** `group_corporate` と書くと
+            # draw.io は不明な shape を無言で描かずに済ませ、書き出しも成功する。枠は出るが
+            # バッジだけが消えるので、XML の検査でもフォントの検査でも見つからない。
+            # 紫の破線（`kind="vpc"`）は使わない。**紫は AWS の VPC の色**で、オンプレミスの
+            # 境界に使うと VPC に見える。
+            Group(
+                "pt_onprem",
+                "pt_onprem",
+                25,
+                90,
+                390,
+                400,
+                gr_icon="group_corporate_data_center",
+            ),
+            Group("pt_aws", "pt_aws", 470, 90, 445, 400),
+        ),
+        boxes=(
+            # ハイパーバイザーもオンプレミスの ONTAP もサードパーティなので箱。
+            Box("pt_hv", "pt_hv", 45, 150, 350, 82),
+            # 縦の中心を FSx for ONTAP のアイコン（400）と揃えて 359。**揃えないと
+            # SnapMirror の線が段違いに折れ、1 本の双方向のエッジが 2 本に見える。**
+            Box("pt_ontap", "pt_ontap", 45, 359, 350, 82),
+        ),
+        texts=(Text("pt_common", "pt_common", 25, 515, 890, 40),),
+        nodes=(
+            Node("pt_ec2", "ec2", "pt_ec2", *centred("ec2", 620, 190)),
+            Node("pt_fsx", "fsx_ontap", "pt_fsx", *centred("fsx_ontap", 700, 400)),
+        ),
+        edges=(
+            Edge("e_pt_hv", "pt_hv", "pt_ontap", "e_pt_hv", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            # 上辺から入る。**左辺は SnapMirror が使うので空けておく。** 同じ辺に 2 本
+            # 入れると、それぞれの中点に置かれるラベルが重なる。
+            Edge("e_pt_ec2", "pt_ec2", "pt_fsx", exit_at=(0.5, 1), entry_at=(0.5, 0)),
+            Edge(
+                "e_pt_sm",
+                "pt_ontap",
+                "pt_fsx",
+                "e_pt_snapmirror",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                both_ways=True,
+                offset=(0.0, 0, -14),
+            ),
+        ),
+    )
+
+
+def _multiprotocol_volume() -> Diagram:
+    """1 つのボリュームの中に 3 つの表現があり、3 つのプロトコルで同時に読めること。
+
+    **箱を 3 つ置いたのは、収束先を 1 つにすると入口が足りないから。** 直交ルーティングが
+    1 ノードに与える入口は左と上の 2 レーンだけで、3 本目は必ずどちらかと重なる。VMDK /
+    VHDX / iSCSI LUN を別の箱にすると、入口が 3 つに分かれるだけでなく、「同じボリューム内に
+    3 つの表現がある」という事実そのものが図で読める。
+
+    **AWS Cloud の枠は置かない。** Amazon EC2 は AWS のサービスなので枠の中に置くべきだが、
+    VMware ESXi と Hyper-V はオンプレミス側で、3 つとも左の列に縦に並ぶ。枠を 1 つ置くと
+    Amazon EC2 が枠の外に出て「AWS の外にある Amazon EC2」になる。境界が事実を壊すなら
+    境界を描かない方を採る。ボリュームの枠は AWS の境界ではなく ONTAP のボリュームなので残す。
+
+    クライアントは上から下へ、入口も上から下へ並べる。**順序を揃えないとエッジが交差する。**
+
+    **FSx for ONTAP のアイコンは枠の左上の外側、クライアントの行より上に置く。** 2 回直した。
+    1 回目は枠の左（クライアントの列と枠の間）で、そこは 3 本のエッジが通る回廊なので、
+    VMware ESXi から来るエッジの中点がアイコンのラベルに落ち `Amazon FSxNFSNetApp ONTAP` と
+    重なった。2 回目は枠の真上に置いて縦に落としたが、**アイコンの下はそのアイコンのラベルの
+    領域なので、真下に引いた線はラベルを貫く。** 右に出してから枠の左辺の x で落とすと、
+    縦の区間がラベルの右端（578）より右（600）に来る。
+
+    どちらもゲートは通る（fontSize もエッジの向きも正しい）。**縮小 PNG を見るまで分からない。**
+    """
+    return Diagram(
+        name="atx-fsxn-multiprotocol-volume",
+        diagram_id="atx-fsxn-multiprotocol-volume",
+        width=940,
+        height=580,
+        groups=(
+            Group(
+                "mp_volume",
+                "mp_volume",
+                600,
+                200,
+                290,
+                340,
+                gr_icon=None,
+                kind="vpc",
+                dashed=True,
+            ),
+        ),
+        boxes=(
+            Box("mp_esxi", "mp_esxi", 30, 180, 260, 82),
+            Box("mp_hyperv", "mp_hyperv", 30, 330, 260, 62),
+            Box("mp_vmdk", "mp_vmdk", 630, 260, 230, 56),
+            Box("mp_vhdx", "mp_vhdx", 630, 360, 230, 56),
+            Box("mp_lun", "mp_lun", 630, 460, 230, 56),
+        ),
+        nodes=(
+            Node("mp_fsx", "fsx_ontap", "mp_fsx", *centred("fsx_ontap", 470, 90)),
+            Node("mp_ec2", "ec2", "mp_ec2", *centred("ec2", 130, 460)),
+        ),
+        edges=(
+            Edge("e_mp_fsx", "mp_fsx", "mp_volume", exit_at=(1, 0.5), entry_at=(0, 0)),
+            Edge(
+                "e_mp_nfs",
+                "mp_esxi",
+                "mp_vmdk",
+                "e_mp_nfs",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+            Edge(
+                "e_mp_smb",
+                "mp_hyperv",
+                "mp_vhdx",
+                "e_mp_smb",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+            Edge(
+                "e_mp_iscsi",
+                "mp_ec2",
+                "mp_lun",
+                "e_mp_iscsi",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+        ),
+    )
+
+
+def _flexclone_blocks() -> Diagram:
+    """FlexClone がオリジナルと物理ブロックを共有していること。
+
+    図 3（Finalize のライフサイクル）とは別の図。**あちらは時間の経過、こちらは静的な構造。**
+    ライフサイクルの図は Snapshot からスプリットまでの順序と所要時間を示すが、「なぜクローンの
+    作成が数秒で済むのか」は示さない。
+
+    ONTAP の Snapshot / FlexClone / LUN には AWS パッケージにアイコンが無いので箱で描く。
+    Amazon EBS の Snapshot アイコンを借りると、ONTAP の機構を Amazon EBS のものとして
+    示すことになる。
+
+    **「ほぼゼロ」と書かず実測値を書く。** 35.5 MiB は blog-03 と同じ検証で測った、8 GiB の
+    ボリュームをクローンした直後の物理消費。
+    """
+    return Diagram(
+        name="atx-fsxn-flexclone-blocks",
+        diagram_id="atx-fsxn-flexclone-blocks",
+        width=940,
+        height=500,
+        groups=(
+            Group(
+                "fc_volume",
+                "fc_volume",
+                260,
+                60,
+                655,
+                400,
+                gr_icon=None,
+                kind="vpc",
+                dashed=True,
+            ),
+        ),
+        boxes=(
+            # 2 つの箱の間は 120px 空けている。**エッジのラベルが置ける幅は箱の間隔で決まる。**
+            # 最初は 90px しか空けておらず、`作成はメタデータ操作だけ`（約 192px）が
+            # FlexClone の箱に 51px 食い込んだ。ラベルを 7 文字に詰めて間隔を 120px にした。
+            Box("fc_orig", "fc_orig", 280, 130, 250, 72),
+            Box("fc_clone", "fc_clone", 650, 130, 250, 72),
+            Box("fc_shared", "fc_shared", 280, 340, 620, 92),
+        ),
+        nodes=(Node("fc_fsx", "fsx_ontap", "fc_fsx", *centred("fsx_ontap", 140, 166)),),
+        edges=(
+            Edge("e_fc_fsx", "fc_fsx", "fc_orig", exit_at=(1, 0.5), entry_at=(0, 0.5)),
+            Edge(
+                "e_fc_create",
+                "fc_orig",
+                "fc_clone",
+                "e_fc_create",
+                exit_at=(1, 0.5),
+                entry_at=(0, 0.5),
+                offset=(0.0, 0, -14),
+            ),
+            # 対称のファン。**近い側の角に落とす。** 両腕をほぼ垂直にすると、片方が
+            # 左向きになるのを避けられる。
+            Edge("e_fc_o", "fc_orig", "fc_shared", exit_at=(0.25, 1), entry_at=(0.15, 0)),
+            Edge("e_fc_c", "fc_clone", "fc_shared", exit_at=(0.75, 1), entry_at=(0.9, 0)),
+        ),
+    )
+
+
 DIAGRAMS = (
     _data_path(),
     _control_path(),
@@ -1317,6 +1760,10 @@ DIAGRAMS = (
     _onprem_to_aws(),
     _iscsi_multipath(),
     _migration_journey(),
+    _vmware_pathways(),
+    _ontap_portability(),
+    _multiprotocol_volume(),
+    _flexclone_blocks(),
 )
 
 # --- rendering ---------------------------------------------------------------------------
