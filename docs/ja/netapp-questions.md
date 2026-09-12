@@ -1,6 +1,6 @@
 # NetApp 確認事項一覧 — VMware → EC2 / FSx for ONTAP 移行
 
-> 目的: Shift Toolkit (Early Preview) と AWS Transform (Public Preview) を踏まえた
+> 目的: Shift Toolkit (Early Preview) と AWS Transform (FSx for ONTAP 宛先は 2026-08-30 に GA) を踏まえた
 > 移行パスの確認。すべて公開情報ベースの技術質問であり、案件固有情報・社名・
 > 内部識別子は含まない。
 

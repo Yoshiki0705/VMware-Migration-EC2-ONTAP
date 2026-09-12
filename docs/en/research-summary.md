@@ -3,6 +3,8 @@
 **Date**: 2026-06-03 (updated 2026-06-21)
 **Status**: Research phase (pre-verification)
 
+> ⚠️ **The body is a snapshot as of 2026-06-03.** Since then, the AWS Transform FSx for ONTAP destination reached **GA on 30 August 2026**. References to "Public Preview" below reflect the state at that time. [(Primary source for GA)](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/) Hands-on verification after GA is in [the verification report](atx-fsxn-ga-verification.md).
+
 ---
 
 ## Executive Summary

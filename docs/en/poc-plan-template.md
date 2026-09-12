@@ -13,7 +13,7 @@
 | Business Sponsor | ________________ |
 | Technical Lead (Customer) | ________________ |
 | Technical Lead (Partner) | ________________ |
-| Tools | □ Shift Toolkit (Early Preview) □ AWS Transform (Public Preview) □ CMC □ MGN |
+| Tools | □ Shift Toolkit (Early Preview) □ AWS Transform (GA) □ CMC □ MGN |
 | Verification Scenario | □ Migration □ DR (Continuous Replication + Recovery) |
 
 ### The Customer's First Question
@@ -66,7 +66,7 @@ Q2: Do you want to place data disks on FSx for ONTAP (iSCSI)?
 
 Q3: How do you want to proceed with migration?
     AWS-native end-to-end (planning, compute, storage) / mixed sources
-        → AWS Transform (VMware migration is free; FSx for ONTAP destination is Public Preview)
+        → AWS Transform (VMware migration is free; FSx for ONTAP destination reached GA on 30 Aug 2026)
           Procedure: docs/en/aws-transform-migration-procedure.md
     Fast conversion via ONTAP FlexClone / small-to-mid scale / PoC
         → Shift Toolkit (Early Preview) ← Primary focus of this template

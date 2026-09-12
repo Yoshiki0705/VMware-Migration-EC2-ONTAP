@@ -23,7 +23,7 @@
 | 観点 | Shift Toolkit | AWS Transform | VM Import/Export | Veeam Restore to EC2 |
 |------|--------------|---------------|-----------------|---------------------|
 | **主な用途** | VMware VM を EC2 + FSx for ONTAP へ移行 | AWS ネイティブな移行計画・実行（discovery → cutover） | VM イメージを AMI 化 | バックアップから EC2 へリストア |
-| **FSx for ONTAP 活用** | ◎ 強い。データディスクを iSCSI LUN として直接配置 | ○ FSx for ONTAP 宛先は Public Preview（2026-06） | △ 基本は EBS 中心。FSx for ONTAP は別途設計 | △ 基本は EBS 中心。FSx for ONTAP は別途設計 |
+| **FSx for ONTAP 活用** | ◎ 強い。データディスクを iSCSI LUN として直接配置 | ◎ FSx for ONTAP 宛先が GA（2026-08-30）。データ領域を iSCSI LUN として直接配置 | △ 基本は EBS 中心。FSx for ONTAP は別途設計 | △ 基本は EBS 中心。FSx for ONTAP は別途設計 |
 | **boot disk** | EBS（VMDK → RAW → S3 → AMI） | EBS（MGN エージェントが自動処理） | EBS（import-image で AMI 化） | EBS（Veeam が EC2 化を処理） |
 | **data disk** | FSx for ONTAP iSCSI LUN（FlexClone ベース） | EBS or FSx for ONTAP（Preview） | EBS 中心 | EBS 中心。FSx for ONTAP は別途検討 |
 | **ソース環境の前提** | ONTAP NFS データストア上の VM **必須** | 任意の VMware 環境（ONTAP 不要） | 任意（VMDK/OVA をエクスポートできればOK） | Veeam でバックアップ取得済みの VM |
@@ -32,7 +32,7 @@
 | **大容量 VM 適性** | 8.1 以降に期待（EBS Direct API） | 高い（継続レプリケーションのためサイズ影響小） | 低い（S3 upload + import に比例して時間増大） | Repository 帯域次第 |
 | **OS 制限** | Shift Toolkit サポートマトリクス参照（VM Import 依存部分あり） | MGN サポートマトリクス参照 | [制限多い](https://docs.aws.amazon.com/vm-import/latest/userguide/prerequisites.html)（EOL OS、P2V、i386 非対応等） | VM Import 依存の可能性あり（要確認） |
 | **操作性** | 専用 GUI（Blueprint ベース） | Agentic AI（チャット型 UI）+ コンソール | CLI 中心（aws ec2 import-image） | Veeam GUI（Restore to EC2 ウィザード） |
-| **成熟度** | Early Preview（EC2 移行パス） | GA（EBS 向け）/ Public Preview（FSx for ONTAP 宛先） | GA（歴史あり） | GA（Veeam 利用企業には馴染みあり） |
+| **成熟度** | Early Preview（EC2 移行パス） | GA（EBS 向け / FSx for ONTAP 宛先とも） | GA（歴史あり） | GA（Veeam 利用企業には馴染みあり） |
 | **ツール費用** | 無料 | 無料（VMware migration agent） | 無料 | Veeam ライセンス必要 |
 | **ネットワーク変換** | 手動（Blueprint で Network Mapping） | AI 自動生成（vSwitch → VPC/SG マッピング） | 手動 | 手動 |
 | **ONTAP 運用継続性** | ◎ SnapMirror break 後に FSx for ONTAP ネイティブ | △ 要確認（Snapshot 系譜の引き継ぎ可否が不明） | ✕ 新規ボリューム扱い | ✕ 新規ボリューム扱い |
@@ -138,7 +138,7 @@ EC2 起動:                       15.1秒
 
 **考慮点:**
 
-- FSx for ONTAP 宛先は Public Preview（制約・GA 時期は未確定）
+- FSx for ONTAP 宛先は 2026-08-30 に GA。ブートは常に Amazon EBS になる
 - ONTAP Snapshot 系譜の引き継ぎ可否が不明（新規 LUN/volume として作成される可能性）
 - レプリケーションエージェントのソース VM へのインストールが必要
 - 継続レプリケーション中のステージング EBS コストが発生
