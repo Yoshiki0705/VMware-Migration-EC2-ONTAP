@@ -89,7 +89,7 @@ Division of labor with AWS Transform is a separate discussion. Shift Toolkit alo
 |---|----------|----------|--------|
 | Q9 | Is AWS Transform's FSx for ONTAP destination block-only (iSCSI LUN), or does it also cover NFS datastore equivalents? | High | ⬜ Unanswered |
 | Q10 | Can Snapshot / SnapMirror / FlexClone / Storage Efficiency continue to be used after migration (lineage and metadata carryover)? | Critical | ✅ Confirmed |
-| Q11 | Is Preview available in the supported region (Tokyo ap-northeast-1)? What are the Preview constraints and GA timeline outlook? | Medium | ⬜ Unanswered |
+| Q11 | Is the FSx for ONTAP destination available in the Tokyo region (ap-northeast-1)? | Medium | 🔶 Partially answered (**GA landed on 30 August 2026.** [What's New](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/). Tokyo availability is unverified) |
 
 ### Q10 Answer Basis (Official Shift Toolkit EC2 Procedure, 2026-06)
 
