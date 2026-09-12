@@ -89,7 +89,7 @@ AWS Transform との分担は別の議論。Shift 単体でこの構成を完結
 |---|------|--------|-----------|
 | Q9 | AWS Transform の FSx for ONTAP 移行先はブロック（iSCSI LUN）のみか、NFS データストア相当も対象か? | High | ⬜ 未回答 |
 | Q10 | 移行後に Snapshot / SnapMirror / FlexClone / Storage Efficiency はそのまま継続利用できるか（系譜・メタデータの引き継ぎ有無）? | Critical | ✅ 確認済み |
-| Q11 | 対応リージョン（東京 ap-northeast-1）での Preview 利用可否、Preview の制約、GA 時期の見通しは? | Medium | ⬜ 未回答 |
+| Q11 | 東京リージョン（ap-northeast-1）で FSx for ONTAP 宛先が利用可能か? | Medium | 🔶 部分回答（**GA 時期は 2026-08-30 に確定。**[What's New](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/)。東京での利用可否は未確認） |
 
 ### Q10 回答根拠（公式 Shift Toolkit EC2 手順書 2026-06）
 
