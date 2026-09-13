@@ -88,6 +88,45 @@ aws cloudformation delete-stack --stack-name vmware-migration-poc
 aws cloudformation wait stack-delete-complete --stack-name vmware-migration-poc
 ```
 
+### When deletion stops at DELETE_FAILED
+
+**This template creates only the FSx for ONTAP file system, not the SVMs or volumes.** Once AWS
+Transform or a migration tool has created SVMs and volumes on that file system, CloudFormation does
+not own them and deletion stops at `DELETE_FAILED`. Deleting an ONTAP file system **requires
+deleting every volume and SVM first**
+([Deleting file systems](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/delete-file-system.html)).
+
+```bash
+# See what is left
+aws fsx describe-volumes --filters Name=file-system-id,Values=<fs-id> \
+  --query 'Volumes[].{Id:VolumeId,Name:Name}' --output table
+aws fsx describe-storage-virtual-machines \
+  --filters Name=file-system-id,Values=<fs-id> \
+  --query 'StorageVirtualMachines[].{Id:StorageVirtualMachineId,Name:Name}' --output table
+
+# Delete volumes, then SVMs, then retry the stack deletion once
+aws cloudformation delete-stack --stack-name vmware-migration-poc
+```
+
+**One retry usually clears `DELETE_FAILED`, so make the retry part of the procedure.**
+
+### The final backup a volume deletion leaves behind
+
+**`aws fsx delete-volume` takes a final backup by default**
+([Deleting volumes](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/deleting-volumes.html)).
+Skipping it is specified at deletion time.
+
+```bash
+aws fsx delete-volume --volume-id <fsvol-id> \
+  --ontap-configuration SkipFinalBackup=true
+```
+
+**`SkipFinalBackup` cannot be set in the template.** It is a `DeleteVolume` API parameter and does
+not appear in the `OntapConfiguration` of `AWS::FSx::Volume`
+([property list](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-fsx-volume-ontapconfiguration.html)).
+**Deleting a volume through CloudFormation therefore leaves one final backup, and it keeps
+billing.** Check with `aws fsx describe-backups` after deletion.
+
 ## Next Steps
 
 - [Migration Method Comparison](migration-method-comparison.md) — Choose which tool to use

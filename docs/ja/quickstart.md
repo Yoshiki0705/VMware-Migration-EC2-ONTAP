@@ -88,6 +88,45 @@ aws cloudformation delete-stack --stack-name vmware-migration-poc
 aws cloudformation wait stack-delete-complete --stack-name vmware-migration-poc
 ```
 
+### 削除が DELETE_FAILED で止まる条件
+
+**このテンプレートが作るのは FSx for ONTAP のファイルシステムだけで、SVM とボリュームは含みません。**
+AWS Transform や移行ツールがファイルシステム上に SVM / ボリュームを作った後は、
+CloudFormation がそれらを所有していないため削除が `DELETE_FAILED` で止まります。
+ONTAP のファイルシステム削除は、**すべてのボリュームと SVM を先に削除することが前提**です
+（[Deleting file systems](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/delete-file-system.html)）。
+
+```bash
+# 残っているものを確認する
+aws fsx describe-volumes --filters Name=file-system-id,Values=<fs-id> \
+  --query 'Volumes[].{Id:VolumeId,Name:Name}' --output table
+aws fsx describe-storage-virtual-machines \
+  --filters Name=file-system-id,Values=<fs-id> \
+  --query 'StorageVirtualMachines[].{Id:StorageVirtualMachineId,Name:Name}' --output table
+
+# ボリューム → SVM の順に削除してから、スタック削除を 1 回再試行する
+aws cloudformation delete-stack --stack-name vmware-migration-poc
+```
+
+**`DELETE_FAILED` は 1 度の再試行で消えることが多いので、再試行を手順に含めてください。**
+
+### ボリューム削除が残す最終バックアップ
+
+**`aws fsx delete-volume` は既定で最終バックアップを取ります**
+（[Deleting volumes](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/deleting-volumes.html)）。
+スキップするには削除時に指定します。
+
+```bash
+aws fsx delete-volume --volume-id <fsvol-id> \
+  --ontap-configuration SkipFinalBackup=true
+```
+
+**`SkipFinalBackup` をテンプレート側に書くことはできません。** `DeleteVolume` API のパラメータで、
+`AWS::FSx::Volume` の `OntapConfiguration`
+（[プロパティ一覧](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-fsx-volume-ontapconfiguration.html)）
+には存在しません。**CloudFormation でボリュームを削除すると最終バックアップが 1 つ残り、課金が続きます。**
+削除後に `aws fsx describe-backups` で確認してください。
+
 ## 次のステップ
 
 - [移行方式比較表](migration-method-comparison.md) — どのツールを使うか決める
