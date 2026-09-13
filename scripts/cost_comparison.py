@@ -422,6 +422,55 @@ VOLUME_SPECS: dict[str, VolumeSpec] = {
 # HDD のスループットはサイズで決まる。**「上限 500 MiB/s」は 12.5 TiB 以上での値である。**
 TIB_IN_GB = 1024
 
+# ------------------------------------------------------------------------------
+# AZ をまたぐときの費用
+#
+# **EBS で 99.99% の Region-Level SLA を満たすには 2 AZ 以上に「アタッチされた」ボリュームが要る。**
+# EBS には AZ をまたぐネイティブなブロック複製が無いので、複製は自分で作る。
+# 一方 FSx for ONTAP の Multi-AZ は AZ 間の同期複製がスループット容量の料金に含まれる。
+# **Single-AZ は逆に、他の AZ からアクセスすると $0.01/GB が各方向にかかる。**
+#
+# 出典: https://aws.amazon.com/fsx/netapp-ontap/pricing/
+#       「for all Multi-AZ file systems, data transfer incurred for replication of data
+#        across AZs is included in the throughput capacity price」
+#       「For Multi-AZ file systems created on or after February 23, 2022, there are no
+#        data transfer charges」/ Single-AZ は「charged $0.01/GB in each direction」
+# ------------------------------------------------------------------------------
+
+TRANSFER_RATES: dict[str, Rate] = {
+    "intra_region": Rate(
+        0.01,
+        "GB",
+        "RVH645383RKU285J",
+        "APN1-DataTransfer-Regional-Bytes",
+        "リージョン内（AZ 間）転送",
+    ),
+}
+
+SNAPSHOT_RATES: dict[str, Rate] = {
+    "standard": Rate(
+        0.05, "GB-Mo", "4NHX4ZW7X52XZACJ", "APN1-EBS:SnapshotUsage", "EBS Snapshot（標準）"
+    ),
+    "archive": Rate(
+        0.0125,
+        "GB-Mo",
+        "9F9M9TDCUDMPZPAV",
+        "APN1-EBS:SnapshotArchiveStorage",
+        "EBS Snapshot（アーカイブ）",
+    ),
+    "archive_retrieval": Rate(
+        0.03,
+        "GB",
+        "D79PRYJVUUH2K9F3",
+        "APN1-EBS:SnapshotArchiveRetrieval",
+        "EBS Snapshot アーカイブの取り出し",
+    ),
+}
+
+# **AZ 間転送は in と out の両方に課金される。** AWS 自身が「$0.01/GB in each direction」と
+# 書いているため、片方向の複製 1 GB は $0.02 として計算する。
+TRANSFER_DIRECTIONS_PER_REPLICATED_GB = 2
+
 # ボリューム 1 本あたりの上限。**値段が付くことと出せることは別である。** 上限を超えた構成に
 # 金額を出すと、EBS 側に実現できない安い値が並ぶ。
 # 出典: https://docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html
@@ -775,6 +824,132 @@ def calculate_ebs_io2_cost(data_size_gb: float, iops: int = 10000, nitro: bool =
     }
 
 
+def ebs_multi_az_cost(
+    volume_type: str,
+    data_size_gb: float,
+    monthly_written_gb: float,
+    iops: int = 0,
+    throughput_mbps: float = 0.0,
+) -> dict:
+    """EBS を 2 AZ に置いて Region-Level SLA（99.99%）の条件を満たす構成の月額。
+
+    **EBS には AZ をまたぐネイティブなブロック複製が無い。** Region-Level SLA の条件は
+    「2 つ以上の AZ にアタッチされたボリューム」なので、**2 本目のボリュームを別の AZ に置いて
+    アタッチし、複製は自分で走らせる**必要がある。この関数が数えるのは次の 3 つである。
+
+      1. ボリューム 2 本分の容量と性能の課金
+      2. 複製で AZ をまたぐ書き込みバイトの転送料（**in と out の両方**）
+      3. スナップショットで代替した場合の保管料（参考値。**SLA の条件は満たさない**）
+
+    **数えていないもの**: 複製先で待機する EC2 インスタンス、複製ソフトウェアのライセンス、
+    整合性を保つための運用。**Multi-Attach は代替にならない**（同一 AZ 限定、io1 / io2 のみ、
+    ブート不可、クラスタファイルシステムが必要）。
+
+    Args:
+        volume_type: EBS のボリュームタイプ
+        data_size_gb: 1 AZ ぶんのデータ容量 (GB)
+        monthly_written_gb: 月間の書き込み量 (GB)。**複製されるのは書き込みだけ**
+        iops: 必要 IOPS
+        throughput_mbps: 必要スループット (MB/s)
+    """
+    one_az = calculate_ebs_cost(
+        volume_type, data_size_gb, iops=iops, throughput_mbps=throughput_mbps
+    )
+    volumes = one_az["total_monthly_usd"] * 2
+    transfer = (
+        monthly_written_gb
+        * TRANSFER_RATES["intra_region"].api_price
+        * TRANSFER_DIRECTIONS_PER_REPLICATED_GB
+    )
+    snapshot_alternative = data_size_gb * SNAPSHOT_RATES["standard"].api_price
+
+    return {
+        "volume_type": volume_type,
+        "azs": 2,
+        "one_az_monthly_usd": one_az["total_monthly_usd"],
+        "two_az_volumes_monthly_usd": round(volumes, 2),
+        "monthly_written_gb": monthly_written_gb,
+        "cross_az_transfer_monthly_usd": round(transfer, 2),
+        "total_monthly_usd": round(volumes + transfer, 2),
+        "snapshot_only_alternative_usd": round(snapshot_alternative, 2),
+        "snapshot_meets_region_sla": False,
+        "feasible": one_az.get("feasible", True),
+        "violations": one_az.get("violations", []),
+        "not_counted": [
+            "複製先で待機する EC2 インスタンスの費用",
+            "複製ソフトウェアのライセンスと構築・運用",
+            "フェイルオーバーの判定と切り替えの仕組み",
+        ],
+    }
+
+
+def fsxn_cross_az_access_cost(deployment: str, monthly_accessed_gb: float) -> dict:
+    """FSx for ONTAP に他の AZ からアクセスしたときの転送料。
+
+    **Multi-AZ は 0 で、Single-AZ は各方向 $0.01/GB。** Multi-AZ の AZ 間複製そのものは
+    スループット容量の料金に含まれる。**Single-AZ を選んで EC2 を別の AZ に置くと、
+    容量単価で浮いた分が転送料で戻ってくる。**
+    """
+    if deployment == "MULTI_AZ_1":
+        return {
+            "deployment": deployment,
+            "monthly_accessed_gb": monthly_accessed_gb,
+            "cross_az_transfer_monthly_usd": 0.0,
+            "replication_included_in_throughput": True,
+            "note": "2022-02-23 以降に作成した Multi-AZ は、優先 AZ 以外からのアクセスでも転送料なし。"
+            "AZ 間複製の転送はスループット容量の料金に含まれる",
+        }
+    cost = (
+        monthly_accessed_gb
+        * TRANSFER_RATES["intra_region"].api_price
+        * TRANSFER_DIRECTIONS_PER_REPLICATED_GB
+    )
+    return {
+        "deployment": deployment,
+        "monthly_accessed_gb": monthly_accessed_gb,
+        "cross_az_transfer_monthly_usd": round(cost, 2),
+        "replication_included_in_throughput": False,
+        "note": "**Single-AZ は他の AZ からのアクセスに各方向 $0.01/GB。** "
+        "EC2 を同じ AZ に置けば 0 になる",
+    }
+
+
+def single_az_transfer_breakeven_gb(
+    logical_gb: float,
+    throughput_mbps: int,
+    efficiency_ratio: float = EFFICIENCY_BY_WORKLOAD["vm"],
+    hot_ratio: float = 1.0,
+    iops: int = 0,
+) -> float | None:
+    """Single-AZ の転送料が Multi-AZ との差額を食い切る月間アクセス量 (GB)。
+
+    **Single-AZ は容量単価が半額だが、他の AZ からアクセスすると各方向 $0.01/GB かかる。**
+    EC2 を同じ AZ に置けば 0 なので、この値は「AZ をまたぐ量がこれを超えると Single-AZ の
+    ほうが高くなる」境界である。差額が無い（Single-AZ のほうが高い）場合は None。
+    """
+    single = calculate_fsxn_cost(
+        logical_gb,
+        throughput_mbps,
+        deployment="SINGLE_AZ_1",
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=hot_ratio,
+        iops=iops,
+    )["total_monthly_usd"]
+    multi = calculate_fsxn_cost(
+        logical_gb,
+        throughput_mbps,
+        deployment="MULTI_AZ_1",
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=hot_ratio,
+        iops=iops,
+    )["total_monthly_usd"]
+    gap = multi - single
+    if gap <= 0:
+        return None
+    per_gb = TRANSFER_RATES["intra_region"].api_price * TRANSFER_DIRECTIONS_PER_REPLICATED_GB
+    return round(gap / per_gb, 1)
+
+
 def compare_all_volume_types(
     logical_gb: float,
     iops: int,
@@ -1048,16 +1223,17 @@ def check_prices(region: str = REGION) -> list[str]:
             pins.append((f"AmazonFSx/{deployment}/{key}", "AmazonFSx", rate))
     for key, rate in EBS_RATES.items():
         pins.append((f"AmazonEC2/{key}", "AmazonEC2", rate))
+    for key, rate in SNAPSHOT_RATES.items():
+        pins.append((f"AmazonEC2/snapshot_{key}", "AmazonEC2", rate))
+    for key, rate in TRANSFER_RATES.items():
+        pins.append((f"AWSDataTransfer/{key}", "AWSDataTransfer", rate))
 
     for name, service_code, rate in pins:
-        resp = client.get_products(
-            ServiceCode=service_code,
-            Filters=[
-                {"Type": "TERM_MATCH", "Field": "usagetype", "Value": rate.usagetype},
-                {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
-            ],
-            MaxResults=10,
-        )
+        filters = [{"Type": "TERM_MATCH", "Field": "usagetype", "Value": rate.usagetype}]
+        # データ転送はグローバルの商品なので regionCode で絞れない（usagetype に APN1 が入る）
+        if service_code != "AWSDataTransfer":
+            filters.append({"Type": "TERM_MATCH", "Field": "regionCode", "Value": region})
+        resp = client.get_products(ServiceCode=service_code, Filters=filters, MaxResults=10)
         found: list[tuple[str, float]] = []
         for raw in resp.get("PriceList", []):
             doc = json.loads(raw)
@@ -1350,6 +1526,69 @@ def generate_comparison_report(
     for spec in VOLUME_SPECS.values():
         a(f"| {spec.label} | {spec.note} |")
     a("")
+    a("## 可用性を揃えた比較（99.99%）")
+    a("")
+    a("**EBS で Region-Level SLA の 99.99% を満たすには、2 つ以上の AZ に")
+    a("アタッチされたボリュームが必要です。** EBS には AZ をまたぐネイティブなブロック複製が")
+    a("無いため、2 本目を別の AZ に置いて複製を自分で走らせます。")
+    a("")
+    written = max(data_size_gb * 0.25, 1.0)
+    mz = ebs_multi_az_cost("gp3", data_size_gb, written, iops=iops, throughput_mbps=throughput_mbps)
+    fsxn_mz = calculate_fsxn_cost(
+        data_size_gb,
+        throughput_mbps,
+        deployment="MULTI_AZ_1",
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=hot_ratio,
+        iops=iops,
+    )
+    a(f"月間書き込みを論理容量の 25%（{written:,.0f} GB）と仮定した場合:")
+    a("")
+    a("| 構成 | SLA | 月額 | 内訳 |")
+    a("|---|---|---|---|")
+    a(f"| EBS gp3 1 AZ | 99.9% | ${mz['one_az_monthly_usd']:,.2f} | ボリューム 1 本 |")
+    a(
+        f"| **EBS gp3 2 AZ** | **99.99%** | **${mz['total_monthly_usd']:,.2f}** "
+        f"| ボリューム 2 本 ${mz['two_az_volumes_monthly_usd']:,.2f} + "
+        f"AZ 間転送 ${mz['cross_az_transfer_monthly_usd']:,.2f} |"
+    )
+    a(
+        f"| **FSx for ONTAP Multi-AZ** | **99.99%** | **${fsxn_mz['total_monthly_usd']:,.2f}** "
+        f"| **AZ 間の同期複製はスループット容量の料金に含まれ、転送料は $0** |"
+    )
+    a("")
+    ratio = mz["total_monthly_usd"] / fsxn_mz["total_monthly_usd"]
+    a(
+        f"**同じ 99.99% で比べると、この条件では FSx for ONTAP が {ratio:.2f} 倍安くなります。**"
+        if ratio > 1
+        else f"**この条件では EBS 2 AZ のほうが {1 / ratio:.2f} 倍安くなります。**"
+    )
+    a("")
+    a("**EBS 2 AZ 側で数えていない費用があります。**")
+    for item in mz["not_counted"]:
+        a(f"- {item}")
+    a("")
+    a("**スナップショットは代替になりません。** Region-Level SLA の条件は「アタッチされた")
+    a("ボリューム」なので、スナップショットだけでは満たしません。")
+    a(
+        f"保管料は ${SNAPSHOT_RATES['standard'].api_price}/GB-月 で、"
+        f"この容量なら ${mz['snapshot_only_alternative_usd']:,.2f} 相当ですが、"
+        "**非同期なので RPO が空きます。**"
+    )
+    a("")
+    a("**Multi-Attach も代替になりません。** 同一 AZ 限定で、io1 / io2 のみ、ブート不可、")
+    a("クラスタファイルシステムが必要です。")
+    a("")
+    breakeven = single_az_transfer_breakeven_gb(
+        data_size_gb, throughput_mbps, efficiency_ratio, hot_ratio, iops
+    )
+    if breakeven:
+        a(
+            f"**逆に Single-AZ を選ぶ場合は転送料が乗ります。** 他の AZ からのアクセスは"
+            f"各方向 $0.01/GB で、**月間 {breakeven:,.0f} GB を超えると Multi-AZ より高くなります。**"
+            f" EC2 を同じ AZ に置けば $0 です。"
+        )
+    a("")
     a("## SLA と耐久性")
     a("")
     a("**この表の 3 構成は可用性のコミットメントが揃っていません。** 費用だけを並べる前に、")
@@ -1466,7 +1705,12 @@ def main() -> int:
             for d in drift:
                 print(f"  {d}", file=sys.stderr)
             return 1
-        total = sum(len(v) for v in FSXN_RATES.values()) + len(EBS_RATES)
+        total = (
+            sum(len(v) for v in FSXN_RATES.values())
+            + len(EBS_RATES)
+            + len(SNAPSHOT_RATES)
+            + len(TRANSFER_RATES)
+        )
         print(f"prices: {total} 件すべて API と一致（{REGION}、固定日 {PRICING_PINNED_AT}）")
         return 0
 

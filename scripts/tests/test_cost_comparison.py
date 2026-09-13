@@ -26,9 +26,12 @@ from cost_comparison import (  # noqa: E402
     IO2_TIER2_LIMIT,
     MIN_SSD_GIB,
     SERVICE_LEVELS,
+    SNAPSHOT_RATES,
     SSD_DECREASE_SUPPORTED,
     SSD_INCLUDED_IOPS_PER_GB,
     SSD_UTILIZATION_TARGET,
+    TRANSFER_DIRECTIONS_PER_REPLICATED_GB,
+    TRANSFER_RATES,
     VOLUME_SPECS,
     calculate_ebs_cost,
     calculate_ebs_gp3_cost,
@@ -37,14 +40,17 @@ from cost_comparison import (  # noqa: E402
     compare_all_volume_types,
     compare_at_scale,
     compare_with_clones,
+    ebs_multi_az_cost,
     find_capacity_crossover,
     find_crossover,
+    fsxn_cross_az_access_cost,
     generate_comparison_report,
     gp3_throughput_per_mbps,
     gp3_violations,
     hdd_throughput,
     io2_iops_cost,
     io2_violations,
+    single_az_transfer_breakeven_gb,
     size_fsxn_capacity,
 )
 
@@ -555,3 +561,96 @@ def test_report_lists_all_volume_types_with_their_constraints():
     for spec in VOLUME_SPECS.values():
         assert spec.label in report, spec.label
     assert "額だけで選べません" in report
+
+
+# ---------------------------------------------------------------- AZ をまたぐ費用
+
+# **可用性を揃えないと費用の比較が成立しない。** EBS の 99.99% は 2 AZ 以上に「アタッチされた」
+# ボリュームが条件で、複製は自分で作る。FSx の Multi-AZ は AZ 間複製が料金に含まれる。
+
+
+def test_two_az_ebs_doubles_the_volume_cost_and_adds_transfer():
+    one = calculate_ebs_cost("gp3", 20480, iops=5000, throughput_mbps=512)
+    two = ebs_multi_az_cost("gp3", 20480, 5120, iops=5000, throughput_mbps=512)
+    assert two["two_az_volumes_monthly_usd"] == pytest.approx(one["total_monthly_usd"] * 2)
+    assert two["cross_az_transfer_monthly_usd"] > 0
+    assert two["total_monthly_usd"] > one["total_monthly_usd"] * 2
+
+
+def test_cross_az_transfer_is_charged_in_both_directions():
+    """**AWS は「$0.01/GB in each direction」と書いている。** 片方向 1 GB は $0.02。"""
+    assert TRANSFER_DIRECTIONS_PER_REPLICATED_GB == 2
+    r = ebs_multi_az_cost("gp3", 1000, 1000)
+    expected = 1000 * TRANSFER_RATES["intra_region"].api_price * 2
+    assert r["cross_az_transfer_monthly_usd"] == pytest.approx(expected)
+    assert r["cross_az_transfer_monthly_usd"] == pytest.approx(20.0)
+
+
+def test_snapshots_do_not_satisfy_the_region_level_sla():
+    """**スナップショットは代替にならない。** 条件は「アタッチされたボリューム」である。"""
+    r = ebs_multi_az_cost("gp3", 20480, 5120)
+    assert r["snapshot_meets_region_sla"] is False
+    assert r["snapshot_only_alternative_usd"] > 0
+
+
+def test_two_az_cost_records_what_it_does_not_count():
+    """**数えていないものを列挙する。** 待機インスタンスと運用は入っていない。"""
+    r = ebs_multi_az_cost("gp3", 20480, 5120)
+    assert len(r["not_counted"]) >= 3
+    assert any("EC2" in x for x in r["not_counted"])
+
+
+def test_multi_az_fsxn_has_no_cross_az_transfer_charge():
+    """**Multi-AZ の AZ 間複製はスループット容量の料金に含まれる。**"""
+    r = fsxn_cross_az_access_cost("MULTI_AZ_1", 100_000)
+    assert r["cross_az_transfer_monthly_usd"] == 0.0
+    assert r["replication_included_in_throughput"] is True
+
+
+def test_single_az_fsxn_is_charged_for_cross_az_access():
+    """**Single-AZ は各方向 $0.01/GB。** 容量単価で浮いた分が戻ってくる経路である。"""
+    r = fsxn_cross_az_access_cost("SINGLE_AZ_1", 10_000)
+    assert r["cross_az_transfer_monthly_usd"] == pytest.approx(10_000 * 0.01 * 2)
+    assert r["replication_included_in_throughput"] is False
+
+
+def test_single_az_has_a_transfer_breakeven_against_multi_az():
+    """**AZ をまたぐ量がこの値を超えると Single-AZ のほうが高くなる。**"""
+    be = single_az_transfer_breakeven_gb(20480, 512, hot_ratio=0.2, iops=5000)
+    assert be is not None and be > 0
+    # 境界の前後で順位が入れ替わる
+    single = calculate_fsxn_cost(20480, 512, deployment="SINGLE_AZ_1", hot_ratio=0.2, iops=5000)[
+        "total_monthly_usd"
+    ]
+    multi = calculate_fsxn_cost(20480, 512, deployment="MULTI_AZ_1", hot_ratio=0.2, iops=5000)[
+        "total_monthly_usd"
+    ]
+    below = (
+        single + fsxn_cross_az_access_cost("SINGLE_AZ_1", be * 0.5)["cross_az_transfer_monthly_usd"]
+    )
+    above = (
+        single + fsxn_cross_az_access_cost("SINGLE_AZ_1", be * 1.5)["cross_az_transfer_monthly_usd"]
+    )
+    assert below < multi < above
+
+
+def test_fsxn_multi_az_beats_two_az_ebs_at_matched_availability():
+    """この条件では、99.99% を揃えると FSx のほうが安い。**条件つきの結論である。**"""
+    ebs = ebs_multi_az_cost("gp3", 20480, 5120, iops=5000, throughput_mbps=512)
+    fsxn = calculate_fsxn_cost(20480, 512, hot_ratio=0.2, iops=5000)
+    assert fsxn["total_monthly_usd"] < ebs["total_monthly_usd"]
+
+
+def test_report_compares_at_matched_availability():
+    report = generate_comparison_report(20480, 512, 0.30, 5000, hot_ratio=0.2)
+    assert "## 可用性を揃えた比較（99.99%）" in report
+    assert "スナップショットは代替になりません" in report
+    assert "Multi-Attach も代替になりません" in report
+    assert "数えていない費用があります" in report
+
+
+def test_transfer_and_snapshot_rates_carry_provenance():
+    for name, table in (("transfer", TRANSFER_RATES), ("snapshot", SNAPSHOT_RATES)):
+        for key, rate in table.items():
+            assert rate.sku, f"{name}/{key}"
+            assert rate.usagetype, f"{name}/{key}"

@@ -266,6 +266,67 @@ does have ceilings, however.
 `scripts/cost_comparison.py` detects configurations that violate these and **prints the cost
 while marking it undeliverable.**
 
+## Comparing at matched availability (99.99%)
+
+**The tables above line up configurations with different availability commitments.** Matching them
+changes the numbers.
+
+**Reaching the 99.99% Region-Level SLA on EBS requires volumes attached in two or more AZs.** EBS
+has no native cross-AZ block replication, so the second volume goes in another AZ and the
+replication is yours to run.
+
+20 TiB logical / 5,000 IOPS / 512 MB/s, assuming monthly writes of 25% of logical capacity
+(5,120 GB):
+
+| Configuration | SLA | Monthly | Breakdown |
+|---|---|---|---|
+| EBS gp3, 1 AZ | 99.9% | $1,996.66 | one volume |
+| **EBS gp3, 2 AZs** | **99.99%** | **$4,095.72** | two volumes $3,993.32 + cross-AZ transfer $102.40 |
+| **FSx for ONTAP Multi-AZ** | **99.99%** | **$1,652.72** | **synchronous cross-AZ replication is included in the throughput capacity price; transfer is $0** |
+
+**At a matched 99.99%, FSx for ONTAP is 2.48x cheaper under these assumptions.** Against single-AZ
+EBS at 99.9%, gp3 was cheaper — **the ranking turns on the availability assumption.**
+
+### What the 2-AZ EBS figure does not count
+
+**These are absent from the $4,095.72.** Including them widens the gap.
+
+| Item | Detail |
+|---|---|
+| Standby EC2 instance | If the replication needs a receiver, its running cost |
+| Replication software | Licensing, build and operation. **Not an AWS managed feature** |
+| Failover machinery | Detection and switchover. **The EBS SLA exclusions cover "failure to acknowledge or switch to a recovery volume"** |
+| Consistency | Asynchronous replication leaves an RPO gap |
+
+### Two things that are not substitutes
+
+**Snapshots are not a substitute.** The Region-Level SLA applies to attached volumes, so snapshots
+alone do not qualify. Storage is $0.05/GB-month (archive $0.0125/GB-month, retrieval $0.03/GB),
+about $1,024.00 at 20 TiB, but **it is asynchronous, so there is an RPO gap and a restore takes
+time.**
+
+**EBS Multi-Attach is not a substitute either.** It is
+[limited to one AZ](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes-multi.html),
+io1/io2 only, **cannot be a boot volume**, and standard file systems (XFS, EXT4) are not designed
+for simultaneous access, so a clustered file system is required. **It does nothing for an AZ
+failure.**
+
+### The transfer charge that comes with Single-AZ
+
+**The asymmetry runs the other way too.** FSx for ONTAP Single-AZ is half the capacity price of
+Multi-AZ, but **access from another AZ costs $0.01/GB in each direction**
+([pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/)).
+
+| Cross-AZ access per month | Single-AZ total | Multi-AZ total |
+|---|---|---|
+| 1 TiB | $923.89 | $1,652.72 |
+| 10 TiB | $1,108.21 | $1,652.72 |
+| 50 TiB | $1,927.41 | $1,652.72 |
+
+**Above 37,466 GB per month (about 36.6 TiB), Single-AZ costs more.** Placing EC2 in the same AZ
+makes the transfer $0. **Multi-AZ file systems created on or after 2022-02-23 incur no transfer
+charge even when accessed from an AZ other than the preferred one.**
+
 ## What this comparison excludes
 
 - **EC2 instance cost**: assumed identical in count and type, so it does not appear in the
