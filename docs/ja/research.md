@@ -813,7 +813,7 @@ fio --name=64k-seqwrite \
 |---|---------|---------|-------|
 | 21 | FSx for ONTAP 月額コスト試算 | 検証構成での月額を算出 | AWS Pricing Calculator + 実測使用量 |
 | 22 | EBS 同等構成コスト試算 | 同容量・同 IOPS を EBS で実現した場合の月額 | AWS Pricing Calculator |
-| 23 | TCO 比較レポート | FSx for ONTAP vs EBS のみ構成の月額差を表形式で提示 | スプレッドシート |
+| 23 | TCO 比較レポート | FSx for ONTAP vs EBS のみ構成の月額差を表形式で提示 | **実施済み: [費用の比較](tco-comparison.md)**（単価は Price List API から取得して固定、`scripts/cost_comparison.py --check-prices` で照合） |
 | 24 | Storage Efficiency によるコスト削減効果 | Dedup/Compression 後の実効容量での再計算 | ONTAP CLI + Pricing |
 
 #### 3e. 移行後運用検証（Reliability/Ops 観点）

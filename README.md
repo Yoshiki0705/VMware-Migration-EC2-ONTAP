@@ -13,6 +13,7 @@
 | やりたいこと | ガイド | 所要時間 |
 |:------------|:------|:---------|
 | 移行方式を比較したい | [移行方式比較表](docs/ja/migration-method-comparison.md) | 10 min |
+| ストレージ費用を比較したい | [費用の比較](docs/ja/tco-comparison.md) | 10 min |
 | Shift Toolkit で移行したい | [Shift Toolkit 手順書](docs/ja/shift-toolkit-ec2-procedure.md) | 30 min |
 | AWS Transform で移行したい | [AWS Transform 手順書](docs/ja/aws-transform-migration-procedure.md) | 30 min |
 | VM Import/Export で移行したい | [VM Import 手順書](docs/ja/vm-import-procedure.md) | 20 min |
