@@ -19,21 +19,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cost_comparison import (  # noqa: E402
     EBS_RATES,
+    EFFICIENCY_BY_WORKLOAD,
     FSXN_RATES,
     GP3_BASELINE_IOPS,
     IO2_TIER1_LIMIT,
     IO2_TIER2_LIMIT,
+    MIN_SSD_GIB,
+    SSD_DECREASE_SUPPORTED,
     SSD_INCLUDED_IOPS_PER_GB,
+    SSD_UTILIZATION_TARGET,
     calculate_ebs_gp3_cost,
     calculate_ebs_io2_cost,
     calculate_fsxn_cost,
     compare_at_scale,
+    compare_with_clones,
+    find_capacity_crossover,
     find_crossover,
     generate_comparison_report,
     gp3_throughput_per_mbps,
     gp3_violations,
     io2_iops_cost,
     io2_violations,
+    size_fsxn_capacity,
 )
 
 # ---------------------------------------------------------------- リクエスト課金
@@ -45,9 +52,7 @@ def test_request_cost_uses_per_operation_rate_not_per_million():
     以前は「百万リクエストあたり $0.0055」という値を持っており、実際の単価
     （読み $0.00037 / 1,000 = 1 オペレーション $0.00000037）と 3 桁ずれていた。
     """
-    r = calculate_fsxn_cost(
-        100, 128, ssd_ratio=0.0, pool_read_requests_millions=1.0, pool_write_requests_millions=0.0
-    )
+    r = calculate_fsxn_cost(100, 128, hot_ratio=0.0, pool_read_requests_millions=1.0)
     rate = FSXN_RATES["MULTI_AZ_1"]["pool_read"].api_price
     assert r["cost_pool_read_requests"] == pytest.approx(1_000_000 * rate, abs=0.01)
     # 100 万回の読みで $0.37。桁を取り違えていないことを額でも固定する
@@ -56,42 +61,138 @@ def test_request_cost_uses_per_operation_rate_not_per_million():
 
 def test_write_requests_cost_more_than_reads():
     """**書きは読みより高い。** 単一の混合単価にまとめると、書きが多い経路を過小に見積もる。"""
-    reads = calculate_fsxn_cost(100, 128, ssd_ratio=0.0, pool_read_requests_millions=10.0)
-    writes = calculate_fsxn_cost(100, 128, ssd_ratio=0.0, pool_write_requests_millions=10.0)
+    reads = calculate_fsxn_cost(100, 128, hot_ratio=0.0, pool_read_requests_millions=10.0)
+    writes = calculate_fsxn_cost(100, 128, hot_ratio=0.0, pool_write_requests_millions=10.0)
     assert writes["cost_pool_write_requests"] > reads["cost_pool_read_requests"]
     ratio = writes["cost_pool_write_requests"] / reads["cost_pool_read_requests"]
     assert ratio == pytest.approx(0.0047 / 0.00037, rel=0.01)
 
 
-# ---------------------------------------------------------------- 確保量課金
+# ---------------------------------------------------------------- サイジング
+
+# **効率化と階層化を確保量に反映させないと比較が成立しない。** EBS は論理容量をそのまま確保するが、
+# FSx for ONTAP が確保するのは「効率化後の物理データが収まる SSD」である。
 
 
-def test_efficiency_does_not_reduce_the_bill_by_default():
-    """**効率化は既定では請求を下げない。** SSD は確保した量で課金される。"""
-    full = calculate_fsxn_cost(1000, 512, efficiency_ratio=1.0)
-    halved = calculate_fsxn_cost(1000, 512, efficiency_ratio=0.5)
-    assert halved["cost_ssd"] == full["cost_ssd"]
-    assert halved["efficiency_reduces_bill"] is False
-    # 空きは報告されるが、請求対象のまま
-    assert halved["efficiency_headroom_gb"] == pytest.approx(500.0)
+def test_efficiency_lowers_the_provisioned_ssd_requirement():
+    """効率化は確保量を減らす。**それが請求に効く経路である。**"""
+    none = size_fsxn_capacity(100_000, efficiency_ratio=1.0)
+    vm = size_fsxn_capacity(100_000, efficiency_ratio=EFFICIENCY_BY_WORKLOAD["vm"])
+    assert vm["physical_gb"] == pytest.approx(30_000)
+    assert vm["ssd_needed_gb"] < none["ssd_needed_gb"]
 
 
-def test_shrinking_provisioned_capacity_is_what_reduces_the_bill():
-    shrunk = calculate_fsxn_cost(1000, 512, efficiency_ratio=0.5, shrink_provisioned=True)
-    full = calculate_fsxn_cost(1000, 512, efficiency_ratio=1.0)
-    assert shrunk["cost_ssd"] == pytest.approx(full["cost_ssd"] / 2)
-    assert shrunk["efficiency_reduces_bill"] is True
+def test_aws_published_efficiency_for_vm_workloads_is_seventy_percent():
+    """**AWS の公表代表値で、このプロジェクトの実測値ではない。**"""
+    assert EFFICIENCY_BY_WORKLOAD["vm"] == 0.30
+    assert EFFICIENCY_BY_WORKLOAD["file-share"] == 0.35
+    assert EFFICIENCY_BY_WORKLOAD["none"] == 1.00
+
+
+def test_tiering_leaves_metadata_on_ssd():
+    """**階層化しても SSD がゼロにはならない。** 容量プール 10 GiB につき 1 GiB が残る。"""
+    s = size_fsxn_capacity(100_000, efficiency_ratio=1.0, hot_ratio=0.0)
+    assert s["capacity_pool_gb"] == pytest.approx(100_000)
+    assert s["pool_metadata_gb"] == pytest.approx(10_000)
+    assert s["ssd_needed_gb"] == pytest.approx(10_000 / SSD_UTILIZATION_TARGET)
+
+
+def test_ssd_is_sized_to_the_eighty_percent_utilization_recommendation():
+    s = size_fsxn_capacity(100_000, efficiency_ratio=1.0, hot_ratio=1.0)
+    assert s["ssd_needed_gb"] == pytest.approx(100_000 / SSD_UTILIZATION_TARGET)
+
+
+def test_minimum_ssd_floor_dominates_small_configurations():
+    """**小さい構成では 1,024 GiB の床が支配する。** ここが FSx が高く出る理由である。"""
+    s = size_fsxn_capacity(500, efficiency_ratio=EFFICIENCY_BY_WORKLOAD["vm"], hot_ratio=0.2)
+    assert s["at_minimum_floor"] is True
+    assert s["provisioned_ssd_gb"] == MIN_SSD_GIB
+
+    big = size_fsxn_capacity(100_000, efficiency_ratio=EFFICIENCY_BY_WORKLOAD["vm"], hot_ratio=0.2)
+    assert big["at_minimum_floor"] is False
+
+
+def test_first_generation_cannot_decrease_ssd():
+    """**第一世代は SSD を減らせない。** 効率化を請求に反映させるには最初から少なく確保する。"""
+    for deployment in ("MULTI_AZ_1", "SINGLE_AZ_1"):
+        assert SSD_DECREASE_SUPPORTED[deployment] is False
+        assert (
+            calculate_fsxn_cost(1000, 512, deployment=deployment)["ssd_decrease_supported"] is False
+        )
+
+
+def test_sizing_rejects_out_of_range_inputs():
+    with pytest.raises(ValueError, match="efficiency_ratio"):
+        size_fsxn_capacity(1000, efficiency_ratio=0.0)
+    with pytest.raises(ValueError, match="hot_ratio"):
+        size_fsxn_capacity(1000, hot_ratio=1.5)
+
+
+# ---------------------------------------------------------------- 逆転点
+
+
+def test_fsxn_is_more_expensive_below_the_crossover_and_cheaper_above():
+    """**小さい構成では EBS、大きい構成では FSx。** 片方だけを示すと結論が反転する。"""
+    small = calculate_fsxn_cost(1024, 512, hot_ratio=0.2, iops=5000)
+    small_ebs = calculate_ebs_gp3_cost(1024, iops=5000, throughput_mbps=512)
+    assert small["total_monthly_usd"] > small_ebs["total_monthly_usd"]
+
+    big = calculate_fsxn_cost(51_200, 512, hot_ratio=0.2, iops=5000)
+    big_ebs = calculate_ebs_gp3_cost(51_200, iops=5000, throughput_mbps=512)
+    assert big["total_monthly_usd"] < big_ebs["total_monthly_usd"]
+
+
+def test_crossover_moves_with_throughput_capacity():
+    """**逆転点はスループット容量でほぼ決まる。** 固定費がそこに集中している。"""
+    low = find_capacity_crossover(128, hot_ratio=0.20)
+    high = find_capacity_crossover(2048, hot_ratio=0.20)
+    assert low is not None and high is not None
+    assert high > low * 5
+
+
+def test_single_az_crosses_over_earlier_than_multi_az():
+    m = find_capacity_crossover(512, deployment="MULTI_AZ_1", hot_ratio=0.20)
+    s = find_capacity_crossover(512, deployment="SINGLE_AZ_1", hot_ratio=0.20)
+    assert s < m
+
+
+def test_without_tiering_the_per_logical_gb_rate_can_exceed_gp3():
+    """**階層化しないと 1 論理 GB あたりで EBS を上回りうる。** 階層化が効いている分を示す。"""
+    hot_only = calculate_fsxn_cost(100_000, 128, hot_ratio=1.0)
+    tiered = calculate_fsxn_cost(100_000, 128, hot_ratio=0.20)
+    assert hot_only["usd_per_logical_gb"] > tiered["usd_per_logical_gb"]
+
+
+# ---------------------------------------------------------------- 複製
+
+
+def test_clones_shift_the_comparison_because_flexclone_shares_blocks():
+    """**FlexClone は作成時にコピーしない。** EBS 側は複製ごとに全容量を確保する。"""
+    none = compare_with_clones(2048, 0, 0.10, 512)
+    many = compare_with_clones(2048, 10, 0.10, 512)
+    assert many["ebs_billed_logical_gb"] == pytest.approx(2048 * 11)
+    # FSx 側は差分だけ
+    assert many["fsxn_billed_logical_gb"] == pytest.approx(2048 * (1 + 10 * 0.10))
+    assert none["fsxn_is_cheaper"] is False
+    assert many["fsxn_is_cheaper"] is True
+
+
+def test_clone_inputs_are_validated():
+    with pytest.raises(ValueError, match="clone_count"):
+        compare_with_clones(1000, -1, 0.1, 512)
+    with pytest.raises(ValueError, match="clone_delta_ratio"):
+        compare_with_clones(1000, 1, 1.5, 512)
 
 
 def test_included_iops_are_three_per_provisioned_gb():
-    """3 IOPS/GB までは込み。超過分だけが課金対象。"""
-    r = calculate_fsxn_cost(1000, 512, iops=3000)
-    assert r["included_iops"] == 1000 * SSD_INCLUDED_IOPS_PER_GB
+    """3 IOPS/GB までは込み。超過分だけが課金対象。確保 SSD に対して計算される。"""
+    r = calculate_fsxn_cost(1000, 512, efficiency_ratio=1.0, iops=3000)
+    assert r["included_iops"] == r["provisioned_ssd_gb"] * SSD_INCLUDED_IOPS_PER_GB
     assert r["billed_extra_iops"] == 0
     assert r["cost_extra_iops"] == 0.0
 
-    over = calculate_fsxn_cost(1000, 512, iops=4000)
-    assert over["billed_extra_iops"] == 1000
+    over = calculate_fsxn_cost(1000, 512, efficiency_ratio=1.0, iops=99_999)
+    assert over["billed_extra_iops"] > 0
 
 
 # ---------------------------------------------------------------- 配置ごとの単価
@@ -169,7 +270,8 @@ def test_io2_total_includes_storage_and_tiered_iops():
 def test_report_states_that_it_is_not_a_production_estimate():
     report = generate_comparison_report(1000, 512, 0.65, 5000)
     assert "本番の見積りではありません" in report
-    assert "効率化は既定では請求を下げません" in report
+    assert "確保量を減らすことで請求に効きます" in report
+    assert "実測値ではありません" in report
 
 
 def test_report_lists_every_pinned_rate_with_its_usagetype():
@@ -228,6 +330,16 @@ def test_io2_iops_ceiling_depends_on_the_instance_generation():
 def test_report_warns_when_the_ebs_column_cannot_be_delivered():
     report = generate_comparison_report(1000, 4096, 1.0, 5000)
     assert "この構成はボリューム 1 本では出せません" in report
+
+
+def test_report_states_when_the_minimum_ssd_floor_dominates():
+    report = generate_comparison_report(500, 128, 0.30, 0, hot_ratio=0.2)
+    assert "床が支配しています" in report
+
+
+def test_report_states_the_capacity_crossover():
+    report = generate_comparison_report(1024, 512, 0.30, 5000, hot_ratio=0.2)
+    assert "を超えると" in report
 
 
 # ---------------------------------------------------------------- 台数
