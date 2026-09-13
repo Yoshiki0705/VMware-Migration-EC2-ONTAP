@@ -25,12 +25,16 @@ from cost_comparison import (  # noqa: E402
     IO2_TIER1_LIMIT,
     IO2_TIER2_LIMIT,
     MIN_SSD_GIB,
+    SERVICE_LEVELS,
     SSD_DECREASE_SUPPORTED,
     SSD_INCLUDED_IOPS_PER_GB,
     SSD_UTILIZATION_TARGET,
+    VOLUME_SPECS,
+    calculate_ebs_cost,
     calculate_ebs_gp3_cost,
     calculate_ebs_io2_cost,
     calculate_fsxn_cost,
+    compare_all_volume_types,
     compare_at_scale,
     compare_with_clones,
     find_capacity_crossover,
@@ -38,6 +42,7 @@ from cost_comparison import (  # noqa: E402
     generate_comparison_report,
     gp3_throughput_per_mbps,
     gp3_violations,
+    hdd_throughput,
     io2_iops_cost,
     io2_violations,
     size_fsxn_capacity,
@@ -370,3 +375,183 @@ def test_crossover_returning_none_means_not_found_within_the_search_range():
 def test_vm_count_must_be_at_least_one():
     with pytest.raises(ValueError, match="1 以上"):
         compare_at_scale(0, 100, 512, 5000)
+
+
+# ---------------------------------------------------------------- SLA と耐久性
+
+# **費用の比較は可用性の前提を揃えないと成立しない。** ここで固定するのは、公表されている
+# コミットメントの構造で、額ではない。
+
+
+def test_ebs_sla_does_not_differ_by_volume_type():
+    """**EBS の SLA はボリュームタイプで分かれない。** 分かれるのは耐久性である。
+
+    gp3 と io2 はどちらも Volume-Level 99.9%。この 1 本の SLA が両タイプに当たるので、
+    「io2 は SLA が高い」は誤り。io2 が高いのは耐久性（99.999% 対 99.8〜99.9%）。
+    """
+    ebs = SERVICE_LEVELS["ebs_volume"]
+    assert ebs.sla_uptime == "99.9%"
+    assert "gp3" in ebs.durability and "io2" in ebs.durability
+    assert "99.999%" in ebs.durability
+
+
+def test_multi_az_fsxn_commits_to_four_nines_on_a_single_file_system():
+    """**Multi-AZ の FSx for ONTAP は 99.99%。** 単一のファイルシステムに対して。"""
+    fsxn = SERVICE_LEVELS["fsxn_multi_az"]
+    assert fsxn.sla_uptime == "99.99%"
+    assert "ファイルシステム 1 つ" in fsxn.sla_scope
+
+
+def test_ebs_needs_two_azs_for_the_same_four_nines():
+    """**EBS の 99.99% は 2 AZ 以上の配置が条件。** 単一ボリュームでは満たせない。"""
+    region = SERVICE_LEVELS["ebs_region"]
+    volume = SERVICE_LEVELS["ebs_volume"]
+    assert region.sla_uptime == "99.99%"
+    assert volume.sla_uptime == "99.9%"
+    assert "2 つ以上の AZ" in region.sla_scope
+    assert "単一ボリュームでは満たせず" in region.sla_scope
+
+
+def test_single_az_fsxn_matches_the_ebs_volume_commitment():
+    """Single-AZ の FSx for ONTAP と EBS ボリューム 1 本は、どちらも 99.9%。"""
+    assert SERVICE_LEVELS["fsxn_single_az"].sla_uptime == "99.9%"
+    assert SERVICE_LEVELS["ebs_volume"].sla_uptime == "99.9%"
+
+
+def test_fsxn_durability_is_not_published():
+    """**FSx for ONTAP に耐久性のパーセンテージは公表されていない。**
+
+    io2 の 99.999% と並べられる数値が無いので、耐久性の優劣は公表値から判定できない。
+    ここを None のままにしておくことで、レポートが数値を作り出さないようにする。
+    """
+    assert SERVICE_LEVELS["fsxn_multi_az"].durability is None
+    assert SERVICE_LEVELS["fsxn_single_az"].durability is None
+
+
+def test_every_service_level_carries_a_source():
+    for key, s in SERVICE_LEVELS.items():
+        assert s.source.startswith("https://"), key
+        assert s.sla_uptime.endswith("%"), key
+
+
+def test_report_lists_the_sla_of_each_configuration():
+    report = generate_comparison_report(20480, 512, 0.30, 5000, hot_ratio=0.2)
+    assert "## SLA と耐久性" in report
+    for key in SERVICE_LEVELS:
+        assert SERVICE_LEVELS[key].sla_uptime in report
+    assert "EBS の SLA はボリュームタイプで分かれません" in report
+    assert "公表値からは耐久性の優劣を判定できません" in report
+
+
+def test_report_names_io2_as_the_durability_matched_comparator():
+    """**構成 C は高 IOPS 向けだけでなく、耐久性を揃えた比較対象でもある。**"""
+    report = generate_comparison_report(20480, 512, 0.30, 5000, hot_ratio=0.2)
+    assert "耐久性を揃えて比べるなら比較対象は io2" in report
+    assert "耐久性を揃えた比較対象" in report
+
+
+# ---------------------------------------------------------------- 全ボリュームタイプ
+
+# **2 タイプだけ並べると比較にならない。** HDD の GB 単価は SSD より 1 桁安く、sc1 は FSx の
+# 容量プールより安い。安さが選定の答えにならないのは、性能の形が違うからである。
+
+
+def test_every_ebs_type_has_a_price_and_a_spec():
+    for vt in ("gp3", "gp2", "io1", "io2", "st1", "sc1"):
+        assert vt in VOLUME_SPECS, vt
+        r = calculate_ebs_cost(vt, 1000, iops=0, throughput_mbps=0)
+        assert r["total_monthly_usd"] > 0, vt
+
+
+def test_sc1_is_cheaper_per_gb_than_the_fsxn_capacity_pool():
+    """**最安の EBS は FSx の容量プールより安い。** それでも要件を満たすかは別問題。"""
+    sc1 = EBS_RATES["sc1_storage"].api_price
+    pool = FSXN_RATES["MULTI_AZ_1"]["capacity_pool"].api_price
+    assert sc1 < pool
+    # ただし継続スループットはサイズ依存で、1 TiB では 12 MiB/s しか出ない
+    assert hdd_throughput("sc1", 1024)["sustained_mbps"] == pytest.approx(12.0)
+
+
+def test_hdd_throughput_scales_with_size_and_caps():
+    """**「st1 は 500 MiB/s」は 12.5 TiB 以上での値。** 小さいボリュームでは出ない。"""
+    assert hdd_throughput("st1", 1024)["sustained_mbps"] == pytest.approx(40.0)
+    assert hdd_throughput("st1", int(12.5 * 1024))["sustained_mbps"] == pytest.approx(500.0)
+    # 上限で止まる
+    assert hdd_throughput("st1", 20 * 1024)["sustained_mbps"] == pytest.approx(500.0)
+    # バーストとベースラインは別
+    one_tib = hdd_throughput("st1", 1024)
+    assert one_tib["burst_mbps"] > one_tib["sustained_mbps"]
+
+
+def test_hdd_is_rejected_when_iops_are_required():
+    """**HDD は IOPS を確保できない。** 要求されたら満たせないと返す。"""
+    for vt in ("st1", "sc1"):
+        r = calculate_ebs_cost(vt, 20480, iops=5000, throughput_mbps=100)
+        assert r["feasible"] is False
+        assert any("IOPS を確保できない" in v for v in r["violations"])
+
+
+def test_hdd_cannot_boot():
+    for vt in ("st1", "sc1"):
+        assert VOLUME_SPECS[vt].bootable is False
+        assert VOLUME_SPECS[vt].random_io_suitable is False
+    for vt in ("gp3", "gp2", "io1", "io2"):
+        assert VOLUME_SPECS[vt].bootable is True
+
+
+def test_gp2_iops_cannot_be_provisioned_and_track_size():
+    """**gp2 は IOPS を指定できない。** 3 IOPS/GiB で決まる。"""
+    r = calculate_ebs_cost("gp2", 100, iops=5000)
+    assert r["feasible"] is False
+    assert any("gp2 は IOPS を指定できない" in v for v in r["violations"])
+    # 十分大きければ満たせる
+    assert calculate_ebs_cost("gp2", 5000, iops=5000)["feasible"] is True
+
+
+def test_gp2_costs_twenty_percent_more_per_gb_than_gp3():
+    gp2 = EBS_RATES["gp2_storage"].api_price
+    gp3 = EBS_RATES["gp3_storage"].api_price
+    assert gp2 / gp3 == pytest.approx(1.25, rel=0.01)
+
+
+def test_io1_and_io2_share_capacity_price_but_not_durability_or_iops_tiering():
+    """**io1 は io2 と容量単価が同じで、耐久性が 2 桁低く、IOPS 単価は下がらない。**"""
+    assert EBS_RATES["io1_storage"].api_price == EBS_RATES["io2_storage"].api_price
+    assert EBS_RATES["io1_iops"].api_price == EBS_RATES["io2_iops_tier1"].api_price
+    assert "99.999%" in VOLUME_SPECS["io2"].durability
+    assert "99.999%" not in VOLUME_SPECS["io1"].durability
+    # 高 IOPS では io2 のほうが安くなる
+    high = 100_000
+    io1 = calculate_ebs_cost("io1", 1000, iops=high)
+    io2 = calculate_ebs_cost("io2", 1000, iops=high)
+    assert io2["total_monthly_usd"] < io1["total_monthly_usd"]
+
+
+def test_comparison_includes_every_type_and_fsxn():
+    rows = compare_all_volume_types(20480, 5000, 512, hot_ratio=0.2)
+    assert len(rows) == len(VOLUME_SPECS) + 1
+    assert sum(1 for r in rows if r["kind"] == "FSx") == 1
+
+
+def test_cheapest_row_can_be_the_one_that_does_not_meet_the_requirement():
+    """**額だけで選べない。** 一番安い行が要件を満たさないことがある。"""
+    rows = sorted(
+        compare_all_volume_types(20480, 5000, 512, hot_ratio=0.2), key=lambda r: r["monthly_usd"]
+    )
+    assert rows[0]["feasible"] is False
+    # 要件を満たすものの中で最安を取ると FSx になる（この条件では）
+    feasible = [r for r in rows if r["feasible"]]
+    assert feasible[0]["kind"] == "FSx"
+
+
+def test_unknown_volume_type_is_rejected():
+    with pytest.raises(ValueError, match="unknown volume type"):
+        calculate_ebs_cost("gp4", 1000)
+
+
+def test_report_lists_all_volume_types_with_their_constraints():
+    report = generate_comparison_report(20480, 512, 0.30, 5000, hot_ratio=0.2)
+    assert "## 全ボリュームタイプとの横並び" in report
+    for spec in VOLUME_SPECS.values():
+        assert spec.label in report, spec.label
+    assert "額だけで選べません" in report
