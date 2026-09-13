@@ -19,14 +19,15 @@
 # WHY THIS FILE IS NOT ENOUGH ON ITS OWN.
 #
 # S3-Burst-on-ONTAP-Files has the mirror check (`make incoming-probes`), which reads a sibling's
-# contract and fails when this repository's cited string is reworded there. **It is wired to one
-# sibling only** -- `CHECKOUT_NAMES` and `RAW_CONTRACT` in its `tools/check_incoming_probes.py`
-# name FSx-for-ONTAP-Adoption-Playbook. So publishing this file does not make that gate cover us,
-# and assuming it does would be a protection that exists only on paper.
+# contract and fails when this repository's cited string is reworded there. It was wired to one
+# sibling only when this file was written. **That is no longer true**: they tabled the sibling list
+# and registered this repository in their #155, and they report 45 probes across 2 siblings verified,
+# plus a negative test -- rewording one registered string failed the gate naming sibling, file and
+# string, while the other 40 passed.
 #
-# Which is why `make outgoing-probes` here reads their repository directly. **The protection this
-# side needs is on this side.** Their gate moving the discovery to the commit that causes it is
-# better, and it has been raised with them, but this file does not depend on that happening.
+# `make outgoing-probes` here still reads their repository directly, and stays. **The protection this
+# side needs is on this side**: their gate fires on their commits, which is where a rewording is
+# cheapest to catch, but a gate owned by someone else is not a dependency this file takes on.
 #
 # TWO LIMITS, DOCUMENTED BY THE OWNER OF THESE STRINGS AND COPIED HERE BECAUSE THEY APPLY EQUALLY:
 #
@@ -42,21 +43,57 @@
 # ---------------------------------------------------------------------------------------------------
 # S3-Burst-on-ONTAP-Files
 #
-# Read at f27363ce8d1d7c7a5eaac4a6472c44af19dd8aa4. Their F-1 (iSCSI, raw device) is measured; F-2
-# (NVMe/TCP) and F-3 (cache-resident) are not.
+# Read at 5d8c28a. **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
+# earlier note here, that F-2 and F-3 were not run, was true at f27363c and is kept only as the
+# reason the probe set was extended rather than written at once.
 #
 # One claim of theirs is restated in this repository rather than pointed at: that deriving a session
 # count by dividing required bandwidth by 625 MBps does not hold. It appears in the blog draft for
 # part 1 and in docs/images/architecture.md, and it is the reason the sentence there no longer
 # implies such a derivation is written down somewhere here.
 #
-# Five probes. The fourth carries an *absence* -- that the cause of the single flow exceeding 5 Gbps
+# Eight probes. The fourth carries an *absence* -- that the cause of the single flow exceeding 5 Gbps
 # is not established. If that absence stops being true they will have found the cause, which is
 # progress, and it is the case where this side most needs to reread rather than keep citing an
 # unexplained number. The fifth is the restriction that keeps the citation honest: their figures are
 # raw-device, and this project puts a filesystem on the LUN.
+#
+# Three more added after F-2 and F-3 (read at 5d8c28a, each occurring once and on one line):
+#
+#   - that the protocol order reverses between "one connection" and the documented procedure. This
+#     is the evidence for keeping this repository's wording that a protocol is not chosen on
+#     throughput. **Not that one is faster** -- the finding is that the order changes with the
+#     procedure and the I/O shape.
+#   - that requesting 36 queues still yielded 4, which is the mechanism itself rather than a value.
+#   - that the same configuration spread 2.64x across environments. This is the reason no single
+#     figure is quoted as the throughput of a configuration, and it is the claim most likely to be
+#     cited by a reader sizing a migration.
+#
+# **No figure is registered as a probe.** `1,135.18` occurs seven times in that file, so a probe on
+# it would pass while the sentence around it changed. The probes are the claim-bearing sentences.
+#
+# NOT REGISTERED, DELIBERATELY: anything about iSCSI being stable across deployments. Their
+# correction: iSCSI was measured in one deployment only, so there is no evidence either way, and
+# "iSCSI was stable" must not become a reason to choose it here.
+#
+# Two more against their block runbook (new in their #160), which is where the limits on using their
+# figures live rather than beside the figures. Both are `reread`, because both are expected to move
+# when they measure more, and movement means this side should reread rather than that a claim broke:
+#
+#   - that a same-filesystem iSCSI vs NVMe/TCP comparison is among the things the procedure cannot
+#     measure. **This is the line that decides how far the protocol comparison can be cited.** The
+#     two protocols were separate runs, and the same NVMe/TCP configuration spread 2.64x across
+#     environments, so the ratio between the protocols is not determined by these figures. If this
+#     bullet disappears they have measured both on one filesystem, and the ratio becomes citable.
+#   - their own instruction not to generalise the missing ANA multipath to "on AL2023". If it
+#     disappears they have recorded the kernel version and the limitation can be stated precisely.
+S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	「AL2023 では」と一般化しない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	同一ファイルシステム上での iSCSI と NVMe/TCP の比較
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 → 2 では逐次スループットが 1 バイトも動かない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	36 を要求しても 4 のままだった
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	「1 接続」では iSCSI が速く、documented な手順のままでは NVMe/TCP が速い
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	この算術は両方向に外れる
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	なぜかは確認していない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	セッション数を帯域の割り算で決める形そのものが成立していない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	ファイルシステムを載せた場合の値ではない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	幅は 2.64 倍である
