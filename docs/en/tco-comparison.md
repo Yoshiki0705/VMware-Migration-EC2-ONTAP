@@ -21,11 +21,75 @@ line is set almost entirely by throughput capacity: **14.0 TiB logical** at Mult
 | 20,480 GB, 20% hot (Single-AZ) | $2,001.46 | **$908.21** | **−54.6%** |
 | 51,200 GB, 20% hot (Multi-AZ) | $4,950.58 | **$2,976.14** | **−39.9%** |
 
-Monthly USD, with the OS disk (EBS gp3 50 GB) included on both sides.
+Monthly USD, with the OS disk (EBS gp3 50 GB) included on both sides. **The EBS side is gp3.**
+All types including gp2, io1, io2, st1 and sc1 are in [every volume type, side by side](#every-volume-type-side-by-side).
+If durability is a requirement the comparator is io2 — read
+[the availability assumptions](#the-availability-assumptions-do-not-match) first.
 
 **Small configurations cost more because the 1,024 GiB SSD minimum and the throughput capacity
 land as fixed cost.** As capacity grows, efficiency and tiering lower the per-logical-GB rate
 until it crosses over.
+
+## Every volume type, side by side
+
+**Lining up only gp3 and io2 is not a comparison.** HDD costs an order of magnitude less per GB
+than SSD, and **sc1 at $0.018/GB is cheaper than the FSx for ONTAP capacity pool at $0.0476/GB.**
+That still does not settle the choice, because the performance shape differs.
+
+Same requirement across all types (5,000 IOPS / 512 MB/s, 20% hot, 70% efficiency).
+
+### Ranking at 2 TiB logical
+
+| Configuration | Monthly | Per logical GB | Meets the requirement |
+|---|---|---|---|
+| Cold HDD sc1 | $36.86 | $0.0180 | **no** |
+| Throughput Optimized HDD st1 | $110.59 | $0.0540 | **no** |
+| General Purpose SSD gp3 | $214.90 | $0.1049 | yes |
+| General Purpose SSD gp2 | $245.76 | $0.1200 | **no** |
+| Provisioned IOPS SSD io1 | $660.82 | $0.3227 | yes |
+| Provisioned IOPS SSD io2 | $660.82 | $0.3227 | yes |
+| **FSx for ONTAP (Multi-AZ)** | **$796.07** | $0.3887 | yes |
+
+### Ranking at 50 TiB logical
+
+| Configuration | Monthly | Per logical GB | Meets the requirement |
+|---|---|---|---|
+| Cold HDD sc1 | $921.60 | $0.0180 | **no** |
+| Throughput Optimized HDD st1 | $2,764.80 | $0.0540 | **no** |
+| **FSx for ONTAP (Multi-AZ)** | **$2,971.34** | **$0.0580** | yes |
+| General Purpose SSD gp3 | $4,945.78 | $0.0966 | yes |
+| General Purpose SSD gp2 | $6,144.00 | $0.1200 | **no** |
+| Provisioned IOPS SSD io1 | $7,640.40 | $0.1492 | yes |
+| Provisioned IOPS SSD io2 | $7,640.40 | $0.1492 | yes |
+
+**Among the options that meet the requirement, FSx is the most expensive at 2 TiB and the cheapest
+at 50 TiB.** At 50 TiB it is $0.0580 per logical GB — **close to st1's $0.0540 and 0.60x gp3.**
+
+**What disqualifies the others is a performance ceiling.**
+
+- **sc1**: sustains 12 MiB/s per TiB. Even at 20 TiB that is 240 MB/s, short of 512 MB/s
+- **st1**: sustains 40 MiB/s per TiB, capped at 500 MB/s. **500 MB/s needs 12.5 TiB or more**
+- **st1 and sc1 both**: **cannot provision IOPS and cannot boot**
+- **gp2**: throughput is capped at 250 MiB/s
+
+### What is easy to miss per type
+
+| Type | Condition |
+|---|---|
+| General Purpose SSD gp3 | **No burst.** Sustains provisioned performance indefinitely. IOPS at 500 per GiB, throughput at 0.25 MiB/s per provisioned IOPS (2,000 MiB/s requires 8,000 IOPS) |
+| General Purpose SSD gp2 | **Performance tracks size** (3 IOPS/GiB, capped at 16,000). Volumes under 1 TiB burst to 3,000 IOPS. **25% more per GB than gp3** |
+| Provisioned IOPS SSD io2 | **Two orders of magnitude more durable** (99.999%). IOPS price tiers down at 32,000 and 64,000. Block Express averages under 500 microseconds for 16 KiB I/O |
+| Provisioned IOPS SSD io1 | **Same capacity price as io2, two orders of magnitude less durable, and its IOPS price does not tier.** No price-based reason to choose it new |
+| Throughput Optimized HDD st1 | **No boot, unsuited to small random I/O.** Baseline 40 MiB/s per TiB |
+| Cold HDD sc1 | **Cheapest per GB. Baseline is 12 MiB/s per TiB.** No boot |
+| FSx for ONTAP | **Throughput capacity is bought once per file system.** 1,024 GiB minimum SSD. Sub-millisecond on SSD, tens of ms on the capacity pool |
+
+Sources: [General Purpose SSD](https://docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html),
+[Provisioned IOPS SSD](https://docs.aws.amazon.com/ebs/latest/userguide/provisioned-iops.html),
+[HDD](https://docs.aws.amazon.com/ebs/latest/userguide/hdd-vols.html).
+
+**Whether HDD can serve the post-migration data volume depends on the I/O shape.** Large sequential
+I/O makes it a candidate; for small random I/O, AWS itself recommends SSD.
 
 ## Effective rate per logical GB
 
@@ -139,12 +203,41 @@ capacity and throughput changes.
 
 ### The availability assumptions do not match
 
-**The tables above put Multi-AZ FSx for ONTAP against single-AZ EBS.** Multi-AZ has file servers
-in two AZs and fails over automatically
-([source](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html)). Giving
-the EBS side equivalent availability takes additional machinery whose cost is not included here.
-**The Single-AZ row brings the availability assumption closer to EBS, at the price of the file
-system being unavailable during an AZ failure.**
+**The tables above line up configurations whose availability commitments differ.** Putting the SLAs
+side by side makes the gap numeric.
+
+| Configuration | SLA (monthly uptime) | Unit it applies to | Allowed downtime per month | Designed durability |
+|---|---|---|---|---|
+| FSx for ONTAP Multi-AZ | **99.99%** | One file system (active-standby across 2 AZs) | ~4.3 min | not published |
+| FSx for ONTAP Single-AZ | **99.9%** | One file system (active-standby in 1 AZ) | ~43.2 min | not published |
+| A single EBS volume (**gp3 or io2**) | **99.9%** | One volume (Volume-Level SLA) | ~43.2 min | gp3: 99.8–99.9% (AFR 0.1–0.2%)<br>**io2: 99.999% (0.001%)** |
+| EBS across 2 or more AZs | **99.99%** | All volumes across 2+ AZs (Region-Level SLA) | ~4.3 min | as above |
+
+Sources: [Amazon FSx SLA](https://aws.amazon.com/fsx/sla/) (2024-06-25),
+[Amazon EBS SLA](https://aws.amazon.com/ebs/sla/) (2022-05-31),
+[EBS volume types](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html).
+Allowed downtime is derived from a 30-day month (43,200 minutes) for reference.
+
+**Three things follow.**
+
+**1. The EBS SLA does not differ by volume type.** gp3 and io2 both carry a 99.9% Volume-Level
+commitment. **What differs is durability**, where io2's 99.999% is two orders of magnitude above
+gp3's 99.8–99.9%. **If durability is a requirement, the comparator is io2 (configuration C), not
+gp3 (configuration A).** Configuration C is labelled "high IOPS" in the cost tables above, but
+**it is also the durability-matched comparator.**
+
+**2. Reaching 99.99% on the EBS side requires volumes in two or more AZs.** The Region-Level SLA
+applies to all volumes across 2+ AZs, so **a single volume cannot qualify.** That takes
+application-level replication, whose cost and operation are not in the tables above. Multi-AZ FSx
+for ONTAP carries **99.99% for one file system.**
+
+**3. FSx for ONTAP publishes no durability percentage.** There is no figure to place against io2's
+99.999%, so **published figures cannot settle which is more durable.** The SLAs are comparable; on
+durability, what can be said stops at "io2 is 99.999%, FSx for ONTAP is not published".
+
+**An SLA is a commitment, not a record.** The remedy for falling short is a service credit, not a
+guarantee of availability (see also the exclusions in the
+[FSx](https://aws.amazon.com/fsx/sla/) and [EBS](https://aws.amazon.com/ebs/sla/) SLAs).
 
 ### Tiering trades latency
 

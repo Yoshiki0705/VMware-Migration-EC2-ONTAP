@@ -178,6 +178,64 @@ MIN_SSD_GIB = 1024
 # 第一世代（SINGLE_AZ_1 / MULTI_AZ_1）で選べるスループット容量。
 GEN1_THROUGHPUT_OPTIONS = (128, 256, 512, 1024, 2048, 4096)
 
+# ------------------------------------------------------------------------------
+# SLA と耐久性
+#
+# **費用の比較は、可用性の前提を揃えないと成立しない。** 契約上のコミットメント（SLA）と
+# 設計上の耐久性は別の指標で、EBS では **SLA はボリュームタイプで分かれず、耐久性が分かれる。**
+# ------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ServiceLevel:
+    """SLA と耐久性の 1 件。**両者は別の指標なので同じ列に混ぜない。**
+
+    Attributes:
+        sla_uptime: 月間アップタイムのコミットメント。下回るとサービスクレジット
+        sla_scope: そのコミットメントが適用される単位。**ここが揃っていないと比較にならない**
+        durability: 設計上の年間耐久性。SLA ではない。公表が無ければ None
+        source: 出典 URL
+    """
+
+    sla_uptime: str
+    sla_scope: str
+    durability: str | None
+    source: str
+
+
+_FSX_SLA = "https://aws.amazon.com/fsx/sla/"
+_EBS_SLA = "https://aws.amazon.com/ebs/sla/"
+_EBS_TYPES = "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html"
+
+# 取得日 2026-09-13。FSx の SLA は 2024-06-25 版、EBS の SLA は 2022-05-31 版。
+SERVICE_LEVELS: dict[str, ServiceLevel] = {
+    "fsxn_multi_az": ServiceLevel(
+        "99.99%",
+        "ファイルシステム 1 つ（2 つの AZ に active-standby でファイルサーバーを持つ）",
+        None,
+        _FSX_SLA,
+    ),
+    "fsxn_single_az": ServiceLevel(
+        "99.9%",
+        "ファイルシステム 1 つ（1 つの AZ に active-standby でファイルサーバーを持つ）",
+        None,
+        _FSX_SLA,
+    ),
+    "ebs_volume": ServiceLevel(
+        "99.9%",
+        "ボリューム 1 本（Volume-Level SLA）",
+        "gp3: 99.8〜99.9%（年間故障率 0.1〜0.2%） / io2: 99.999%（0.001%）",
+        _EBS_SLA,
+    ),
+    "ebs_region": ServiceLevel(
+        "99.99%",
+        "**2 つ以上の AZ に配置したボリューム全体**（Region-Level SLA）。"
+        "単一ボリュームでは満たせず、アプリケーション側の複製が要る",
+        "同上（タイプで決まり、SLA では分かれない）",
+        _EBS_SLA,
+    ),
+}
+
 # **第一世代は SSD を減らせない。** 減設は第二世代のみで、最小 9% 刻み、減設後も 80% 以下。
 # つまり第一世代では、効率化で空いた容量を後から請求から外せない。
 # 出典: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/storage-capacity-and-IOPS.html
@@ -216,12 +274,153 @@ EBS_RATES: dict[str, Rate] = {
         "APN1-EBS:VolumeP-IOPS.io2.tier3",
         "io2 IOPS（64,000 超）",
     ),
+    # gp2 は IOPS の別課金が無い。**容量単価に性能が含まれる形で、gp3 より 20% 高い。**
+    "gp2_storage": Rate(0.120, "GB-Mo", "2KRSTFABXH77P2FQ", "APN1-EBS:VolumeUsage.gp2", "gp2 容量"),
+    # io1 は容量が io2 と同額、IOPS は階層が無く一律。
+    "io1_storage": Rate(
+        0.142, "GB-Mo", "9NAC6FAA5YD4J8DE", "APN1-EBS:VolumeUsage.piops", "io1 容量"
+    ),
+    "io1_iops": Rate(
+        0.074, "IOPS-Mo", "J5Z28Z87PP737A45", "APN1-EBS:VolumeP-IOPS.piops", "io1 IOPS（階層なし）"
+    ),
+    # HDD は IOPS もスループットも別課金が無い。**容量単価だけで、性能はサイズで決まる。**
+    "st1_storage": Rate(0.054, "GB-Mo", "XFKFYKTCXSEG2DMU", "APN1-EBS:VolumeUsage.st1", "st1 容量"),
+    "sc1_storage": Rate(0.018, "GB-Mo", "MPKBGKZFDXTW69NM", "APN1-EBS:VolumeUsage.sc1", "sc1 容量"),
 }
 
 GP3_BASELINE_IOPS = 3000
 GP3_BASELINE_THROUGHPUT_MBPS = 125
 IO2_TIER1_LIMIT = 32_000
 IO2_TIER2_LIMIT = 64_000
+
+# ------------------------------------------------------------------------------
+# EBS ボリュームタイプごとの仕様
+#
+# **タイプを 2 つだけ並べると比較にならない。** HDD は GB 単価が SSD より 1 桁安く、
+# sc1 の $0.018/GB は FSx for ONTAP の容量プール $0.0476/GB より安い。**ただし性能の形が違う。**
+# HDD はスループットがボリュームサイズに比例し、バースト後はベースラインに落ちる。
+# st1 と sc1 はブートできず、小さいランダム I/O には向かない。
+#
+# 出典: https://docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html
+#       https://docs.aws.amazon.com/ebs/latest/userguide/provisioned-iops.html
+#       https://docs.aws.amazon.com/ebs/latest/userguide/hdd-vols.html
+# ------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VolumeSpec:
+    """EBS ボリュームタイプ 1 つの仕様。**単価ではなく、出せる性能と制約を持つ。**
+
+    Attributes:
+        label: 表示名
+        max_iops: ボリューム 1 本の最大 IOPS。None は IOPS を確保しないタイプ
+        max_throughput_mbps: ボリューム 1 本の最大スループット (MiB/s)
+        baseline_throughput_per_tib: HDD のベースライン (MiB/s per TiB)。SSD は None
+        burst_throughput_per_tib: HDD のバースト上限 (MiB/s per TiB)。SSD は None
+        durability: 設計上の年間耐久性
+        latency: 公表されているレイテンシの記述
+        bootable: ブートボリュームに使えるか
+        random_io_suitable: 小さいランダム I/O に向くか
+        note: 見落とすと選定を誤る条件
+    """
+
+    label: str
+    max_iops: int | None
+    max_throughput_mbps: int
+    baseline_throughput_per_tib: float | None
+    burst_throughput_per_tib: float | None
+    durability: str
+    latency: str
+    bootable: bool
+    random_io_suitable: bool
+    note: str
+
+
+_SSD_DURABILITY = "99.8〜99.9%（年間故障率 0.1〜0.2%）"
+_IO2_DURABILITY = "99.999%（年間故障率 0.001%）"
+
+VOLUME_SPECS: dict[str, VolumeSpec] = {
+    "gp3": VolumeSpec(
+        "汎用 SSD gp3",
+        80_000,
+        2_000,
+        None,
+        None,
+        _SSD_DURABILITY,
+        "1 桁ミリ秒",
+        True,
+        True,
+        "**バーストしない。** 確保した性能を継続して出す。IOPS は 500 IOPS/GiB、"
+        "スループットは 0.25 MiB/s per IOPS が上限",
+    ),
+    "gp2": VolumeSpec(
+        "汎用 SSD gp2",
+        16_000,
+        250,
+        None,
+        None,
+        _SSD_DURABILITY,
+        "1 桁ミリ秒",
+        True,
+        True,
+        "**性能がサイズに連動する**（3 IOPS/GiB）。1 TiB 未満は 3,000 IOPS までバースト。"
+        "**GB 単価は gp3 より 20% 高い**",
+    ),
+    "io2": VolumeSpec(
+        "プロビジョンド IOPS SSD io2",
+        256_000,
+        4_000,
+        None,
+        None,
+        _IO2_DURABILITY,
+        "io2 Block Express は 16 KiB I/O で平均 500 マイクロ秒未満",
+        True,
+        True,
+        "**耐久性が 2 桁高い。** IOPS 単価は 32,000 と 64,000 で下がる",
+    ),
+    "io1": VolumeSpec(
+        "プロビジョンド IOPS SSD io1",
+        64_000,
+        1_000,
+        None,
+        None,
+        _SSD_DURABILITY,
+        "1 桁ミリ秒",
+        True,
+        True,
+        "**io2 と容量単価が同じで、耐久性は 2 桁低く、IOPS 単価は下がらない。**"
+        "新規に選ぶ理由が価格面では見つからない",
+    ),
+    "st1": VolumeSpec(
+        "スループット最適化 HDD st1",
+        None,
+        500,
+        40.0,
+        250.0,
+        _SSD_DURABILITY,
+        "HDD。公表レイテンシなし",
+        False,
+        False,
+        "**ブート不可。小さいランダム I/O に向かない。** ベースライン 40 MiB/s per TiB で、"
+        "クレジットを使い切るとそこまで落ちる",
+    ),
+    "sc1": VolumeSpec(
+        "コールド HDD sc1",
+        None,
+        250,
+        12.0,
+        80.0,
+        _SSD_DURABILITY,
+        "HDD。公表レイテンシなし",
+        False,
+        False,
+        "**最安の GB 単価だが、ベースラインは 12 MiB/s per TiB。** ブート不可。"
+        "1 TiB で 12 MiB/s しか継続して出ない",
+    ),
+}
+
+# HDD のスループットはサイズで決まる。**「上限 500 MiB/s」は 12.5 TiB 以上での値である。**
+TIB_IN_GB = 1024
 
 # ボリューム 1 本あたりの上限。**値段が付くことと出せることは別である。** 上限を超えた構成に
 # 金額を出すと、EBS 側に実現できない安い値が並ぶ。
@@ -454,6 +653,109 @@ def calculate_ebs_gp3_cost(
     }
 
 
+def hdd_throughput(volume_type: str, size_gb: float) -> dict:
+    """HDD のスループットをサイズから出す。
+
+    **「st1 は 500 MiB/s」は 12.5 TiB 以上での値である。** ベースラインとバーストは
+    どちらもサイズに比例し、それぞれ上限で止まる。クレジットを使い切ると
+    ベースラインまで落ちるので、継続して出る値はベースラインのほうである。
+    """
+    spec = VOLUME_SPECS[volume_type]
+    if spec.baseline_throughput_per_tib is None:
+        raise ValueError(f"{volume_type} は HDD ではない")
+    tib = size_gb / TIB_IN_GB
+    baseline = min(spec.baseline_throughput_per_tib * tib, spec.max_throughput_mbps)
+    burst = min(spec.burst_throughput_per_tib * tib, spec.max_throughput_mbps)
+    return {
+        "size_gb": size_gb,
+        "baseline_mbps": round(baseline, 1),
+        "burst_mbps": round(burst, 1),
+        "sustained_mbps": round(baseline, 1),
+    }
+
+
+def calculate_ebs_cost(
+    volume_type: str,
+    data_size_gb: float,
+    iops: int = 0,
+    throughput_mbps: float = 0.0,
+    nitro: bool = True,
+) -> dict:
+    """EBS の任意のボリュームタイプの月額コスト。
+
+    **タイプごとに課金の形が違う。** gp3 は容量 + 超過 IOPS + 超過スループット、gp2 と HDD は
+    容量だけ、io1 は容量 + 一律 IOPS、io2 は容量 + 階層 IOPS。
+    HDD については `throughput_mbps` を要求値として扱い、**サイズから出る値で足りるかを判定する。**
+    """
+    if volume_type not in VOLUME_SPECS:
+        raise ValueError(f"unknown volume type: {volume_type}. {sorted(VOLUME_SPECS)} のいずれか")
+    spec = VOLUME_SPECS[volume_type]
+    violations: list[str] = []
+    breakdown: dict[str, float] = {}
+
+    if volume_type == "gp3":
+        r = calculate_ebs_gp3_cost(
+            data_size_gb,
+            iops=iops or GP3_BASELINE_IOPS,
+            throughput_mbps=int(throughput_mbps or GP3_BASELINE_THROUGHPUT_MBPS),
+        )
+        return {**r, "volume_type": volume_type, "spec": spec}
+    if volume_type == "gp2":
+        breakdown["容量"] = data_size_gb * EBS_RATES["gp2_storage"].api_price
+        # gp2 の IOPS は 3 IOPS/GiB で決まり、指定できない
+        delivered = min(max(100, int(data_size_gb * 3)), spec.max_iops)
+        if iops > delivered:
+            violations.append(
+                f"IOPS {iops:,} に対し、この容量の gp2 が出すのは {delivered:,}"
+                f"（3 IOPS/GiB、上限 {spec.max_iops:,}）。**gp2 は IOPS を指定できない**"
+            )
+        if throughput_mbps > spec.max_throughput_mbps:
+            violations.append(
+                f"スループット {throughput_mbps:,.0f} MB/s が gp2 の上限 "
+                f"{spec.max_throughput_mbps:,} MiB/s を超える"
+            )
+    elif volume_type == "io1":
+        breakdown["容量"] = data_size_gb * EBS_RATES["io1_storage"].api_price
+        breakdown["IOPS"] = iops * EBS_RATES["io1_iops"].api_price
+        if iops > spec.max_iops:
+            violations.append(f"IOPS {iops:,} が io1 の上限 {spec.max_iops:,} を超える")
+    elif volume_type == "io2":
+        r = calculate_ebs_io2_cost(data_size_gb, iops=iops, nitro=nitro)
+        return {**r, "volume_type": volume_type, "spec": spec}
+    else:  # st1 / sc1
+        breakdown["容量"] = data_size_gb * EBS_RATES[f"{volume_type}_storage"].api_price
+        tp = hdd_throughput(volume_type, data_size_gb)
+        if throughput_mbps > tp["sustained_mbps"]:
+            violations.append(
+                f"**継続して出るのは {tp['sustained_mbps']:,.1f} MB/s** "
+                f"（{spec.baseline_throughput_per_tib} MiB/s per TiB × "
+                f"{data_size_gb / TIB_IN_GB:,.2f} TiB）。要求 {throughput_mbps:,.0f} MB/s に届かない"
+                f"。バーストは {tp['burst_mbps']:,.1f} MB/s まで"
+            )
+        if iops:
+            violations.append(
+                f"**{volume_type} は IOPS を確保できない。** 小さいランダム I/O には向かない"
+            )
+        breakdown["_sustained_mbps"] = tp["sustained_mbps"]
+        breakdown["_burst_mbps"] = tp["burst_mbps"]
+
+    total = sum(v for k, v in breakdown.items() if not k.startswith("_"))
+    return {
+        "service": f"EBS {volume_type}",
+        "volume_type": volume_type,
+        "spec": spec,
+        "data_gb": data_size_gb,
+        "provisioned_iops": iops,
+        "cost_breakdown": {k: round(v, 2) for k, v in breakdown.items() if not k.startswith("_")},
+        "sustained_throughput_mbps": breakdown.get("_sustained_mbps"),
+        "burst_throughput_mbps": breakdown.get("_burst_mbps"),
+        "feasible": not violations,
+        "violations": violations,
+        "total_monthly_usd": round(total, 2),
+        "usd_per_gb": round(total / data_size_gb, 4) if data_size_gb else None,
+    }
+
+
 def calculate_ebs_io2_cost(data_size_gb: float, iops: int = 10000, nitro: bool = True) -> dict:
     """EBS io2 の月額コスト。IOPS は階層で単価が下がる。"""
     storage_cost = data_size_gb * EBS_RATES["io2_storage"].api_price
@@ -471,6 +773,71 @@ def calculate_ebs_io2_cost(data_size_gb: float, iops: int = 10000, nitro: bool =
         "cost_iops": round(iops_cost, 2),
         "total_monthly_usd": round(total, 2),
     }
+
+
+def compare_all_volume_types(
+    logical_gb: float,
+    iops: int,
+    throughput_mbps: float,
+    fsxn_deployment: str = "MULTI_AZ_1",
+    efficiency_ratio: float = EFFICIENCY_BY_WORKLOAD["vm"],
+    hot_ratio: float = 1.0,
+) -> list[dict]:
+    """EBS の全タイプと FSx for ONTAP を同じ要件で並べる。
+
+    **要件を固定して、出せるかどうかと月額を同時に出す。** 安い順に並べても、
+    実現できない構成が上に来るので、`feasible` を見ずに額だけで比較できない。
+
+    FSx for ONTAP は論理容量 `logical_gb` を収める構成として計算するため、
+    **EBS 側の「容量 = 論理容量」と違い、確保量は効率化と階層化で決まる。**
+    """
+    rows: list[dict] = []
+    for vt in ("sc1", "st1", "gp3", "gp2", "io1", "io2"):
+        r = calculate_ebs_cost(vt, logical_gb, iops=iops, throughput_mbps=throughput_mbps)
+        spec = VOLUME_SPECS[vt]
+        rows.append(
+            {
+                "name": spec.label,
+                "kind": "EBS",
+                "monthly_usd": r["total_monthly_usd"],
+                "usd_per_logical_gb": round(r["total_monthly_usd"] / logical_gb, 4),
+                "feasible": r.get("feasible", True),
+                "violations": r.get("violations", []),
+                "durability": spec.durability,
+                "latency": spec.latency,
+                "bootable": spec.bootable,
+                "random_io_suitable": spec.random_io_suitable,
+                "note": spec.note,
+            }
+        )
+
+    f = calculate_fsxn_cost(
+        logical_gb,
+        int(throughput_mbps) or 128,
+        deployment=fsxn_deployment,
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=hot_ratio,
+        iops=iops,
+    )
+    sla = SERVICE_LEVELS["fsxn_multi_az" if fsxn_deployment == "MULTI_AZ_1" else "fsxn_single_az"]
+    rows.append(
+        {
+            "name": f"FSx for ONTAP（{fsxn_deployment}、効率化 "
+            f"{round((1 - efficiency_ratio) * 100)}% / hot {round(hot_ratio * 100)}%）",
+            "kind": "FSx",
+            "monthly_usd": f["total_monthly_usd"],
+            "usd_per_logical_gb": f["usd_per_logical_gb"],
+            "feasible": True,
+            "violations": [],
+            "durability": "公表なし",
+            "latency": "SSD はサブミリ秒、容量プールは数十ミリ秒",
+            "bootable": False,
+            "random_io_suitable": True,
+            "note": f"SLA {sla.sla_uptime}。**スループット容量はファイルシステム単位で 1 回買う。**"
+            f"最小 SSD {MIN_SSD_GIB:,} GiB",
+        }
+    )
+    return rows
 
 
 # ==============================================================================
@@ -785,7 +1152,10 @@ def generate_comparison_report(
     a("")
     a("## 構成比較")
     a("")
-    a("| 項目 | 構成 A: EBS gp3 のみ | 構成 B: EBS + FSx for ONTAP | 構成 C: EBS io2 |")
+    a(
+        "| 項目 | 構成 A: EBS gp3 のみ | 構成 B: EBS + FSx for ONTAP "
+        "| 構成 C: EBS io2（高 IOPS / 耐久性 99.999%） |"
+    )
     a("|---|---|---|---|")
     a(f"| OS ディスク | EBS gp3 {OS_DISK_GB}GB | EBS gp3 {OS_DISK_GB}GB | EBS gp3 {OS_DISK_GB}GB |")
     a(
@@ -860,7 +1230,7 @@ def generate_comparison_report(
         f"（`ssd_decrease_supported` = {fsxn['ssd_decrease_supported']}）"
     )
     a("")
-    a("### 構成 C: EBS io2")
+    a("### 構成 C: EBS io2（耐久性を揃えた比較対象）")
     a("")
     a(f"- OS ディスク（EBS gp3）: ${os_disk_cost:.2f}")
     a(f"- データ容量: ${ebs_io2['cost_storage']:.2f}")
@@ -933,6 +1303,75 @@ def generate_comparison_report(
         a("容量が増えると効率化と階層化で 1 論理 GB あたりの単価が下がり、どこかで逆転します。")
         a(f"1 論理 GB あたりはこの構成で ${fsxn['usd_per_logical_gb']}、")
         a(f"EBS gp3 は ${EBS_RATES['gp3_storage'].api_price} です（容量以外を除く）。")
+    a("")
+    a("## 全ボリュームタイプとの横並び")
+    a("")
+    a(
+        f"同じ要件（論理 {data_size_gb:,.0f} GB / {iops:,} IOPS / "
+        f"{throughput_mbps:,} MB/s）で全タイプを並べます。"
+    )
+    a("**安い順に並んでいますが、上のほうは要件を満たしません。** 額だけで選べません。")
+    a("")
+    a("| 構成 | 月額 | 論理 1 GB あたり | 要件を満たすか | 耐久性 | レイテンシ | ブート |")
+    a("|---|---|---|---|---|---|---|")
+    rows = compare_all_volume_types(
+        data_size_gb,
+        iops,
+        throughput_mbps,
+        fsxn_deployment=deployment,
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=hot_ratio,
+    )
+    for row in sorted(rows, key=lambda r: r["monthly_usd"]):
+        ok = "満たす" if row["feasible"] else "**満たさない**"
+        boot = "可" if row["bootable"] else "不可"
+        a(
+            f"| {row['name']} | ${row['monthly_usd']:,.2f} | ${row['usd_per_logical_gb']} "
+            f"| {ok} | {row['durability']} | {row['latency']} | {boot} |"
+        )
+    a("")
+    a("要件を満たさない理由:")
+    a("")
+    for row in sorted(rows, key=lambda r: r["monthly_usd"]):
+        if not row["feasible"]:
+            for v in row["violations"]:
+                a(f"- **{row['name']}**: {v}")
+    a("")
+    a(
+        f"**HDD の GB 単価は FSx for ONTAP の容量プールより安いです**"
+        f"（sc1 ${EBS_RATES['sc1_storage'].api_price}/GB 対 容量プール "
+        f"${FSXN_RATES[deployment]['capacity_pool'].api_price}/GB）。"
+    )
+    a("**ただし HDD はスループットがサイズに比例し、ブートできず、小さいランダム I/O に")
+    a("向きません。** 移行後の VM のデータ領域として使えるかは、I/O の形で決まります。")
+    a("")
+    a("| タイプ | 見落とすと選定を誤る条件 |")
+    a("|---|---|")
+    for spec in VOLUME_SPECS.values():
+        a(f"| {spec.label} | {spec.note} |")
+    a("")
+    a("## SLA と耐久性")
+    a("")
+    a("**この表の 3 構成は可用性のコミットメントが揃っていません。** 費用だけを並べる前に、")
+    a("どの単位に何が約束されているかを確認してください。")
+    a("")
+    a("| 構成 | SLA（月間アップタイム） | 適用される単位 | 設計上の耐久性 |")
+    a("|---|---|---|---|")
+    for key, label in (
+        ("fsxn_multi_az", "FSx for ONTAP Multi-AZ"),
+        ("fsxn_single_az", "FSx for ONTAP Single-AZ"),
+        ("ebs_volume", "EBS（gp3 / io2 いずれも）"),
+        ("ebs_region", "EBS を 2 AZ 以上に配置"),
+    ):
+        s = SERVICE_LEVELS[key]
+        a(f"| {label} | **{s.sla_uptime}** | {s.sla_scope} | {s.durability or '公表なし'} |")
+    a("")
+    a("**EBS の SLA はボリュームタイプで分かれません。** 分かれるのは耐久性で、")
+    a("io2 の 99.999% は gp3 の 99.8〜99.9% より 2 桁高いです。")
+    a("**耐久性を揃えて比べるなら比較対象は io2**（構成 C）で、gp3（構成 A）ではありません。")
+    a("")
+    a("**FSx for ONTAP には耐久性のパーセンテージが公表されていません。** io2 の 99.999% と")
+    a("並べられる数値が無いため、**公表値からは耐久性の優劣を判定できません。**")
     a("")
     a("## 単価の出所")
     a("")
