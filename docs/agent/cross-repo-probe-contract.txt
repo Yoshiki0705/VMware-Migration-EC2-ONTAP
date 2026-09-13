@@ -39,13 +39,23 @@
 #
 # Line breaks matter: a probe spanning one never matches. `上限は 1 フローの容量ではない` was
 # rejected as a candidate for exactly that reason and the two strings around it registered instead.
+# **They later recommended that same string as a replacement, describing it as occurring once on one
+# line. Checked at 1bedd45: zero occurrences.** It is still split, now across lines 957-958 of their
+# results file (`**上限は 1 フローの` / `容量ではない。**`), and `git grep` over their whole docs tree
+# finds it nowhere. Their other suggestion, the already-registered division string, is what stands.
 #
 # ---------------------------------------------------------------------------------------------------
 # S3-Burst-on-ONTAP-Files
 #
-# Read at 5d8c28a. **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
+# Read at 1bedd45. **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
 # earlier note here, that F-2 and F-3 were not run, was true at f27363c and is kept only as the
 # reason the probe set was extended rather than written at once.
+#
+# Repinned from 5d8c28a after their #164 rebuilt the comparison table: the ratio column became a
+# measurement-count column, the NVMe/TCP cells became observed ranges, and a note now says the ratio
+# is not written because numerator and denominator come from different file systems. **Nothing here
+# had to be withdrawn** -- this side had already declined to quote a ratio for that reason, and the
+# interval their note now gives (1.14-3.00x) is the one derived here independently.
 #
 # One claim of theirs is restated in this repository rather than pointed at: that deriving a session
 # count by dividing required bandwidth by 625 MBps does not hold. It appears in the blog draft for
@@ -69,6 +79,17 @@
 #     figure is quoted as the throughput of a configuration, and it is the claim most likely to be
 #     cited by a reader sizing a migration.
 #
+# `なぜかは確認していない` was **withdrawn**: their #164 additions made it occur twice in that file
+# (lines 963 and 1080), and a probe on a repeated string passes while one of the two is reworded.
+# Both places carry the same absence, so it is replaced by one unique single-line string from each:
+# `どれが当たっているかを検証していないので、原因を書かない` (the F-1 note that names the absence) and
+# `9.08 Gbps を運んでおり、同じ上限には当たっていない` (the same absence in the comparison section).
+# Rewording either now fails rather than half-failing silently.
+#
+# `倍率を書かない` is registered as `reread`, not `retraction`. It is the sentence that licenses this
+# repository's refusal to quote a protocol ratio. If it goes, they have most likely measured both
+# protocols on one file system, and the ratio becomes citable -- a reason to reread, not a breakage.
+#
 # **No figure is registered as a probe.** `1,135.18` occurs seven times in that file, so a probe on
 # it would pass while the sentence around it changed. The probes are the claim-bearing sentences.
 #
@@ -89,11 +110,13 @@
 #     disappears they have recorded the kernel version and the limitation can be stated precisely.
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	「AL2023 では」と一般化しない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	同一ファイルシステム上での iSCSI と NVMe/TCP の比較
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	reread	倍率を書かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 → 2 では逐次スループットが 1 バイトも動かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	36 を要求しても 4 のままだった
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	9.08 Gbps を運んでおり、同じ上限には当たっていない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	「1 接続」では iSCSI が速く、documented な手順のままでは NVMe/TCP が速い
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	この算術は両方向に外れる
-S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	なぜかは確認していない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	どれが当たっているかを検証していないので、原因を書かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	セッション数を帯域の割り算で決める形そのものが成立していない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	ファイルシステムを載せた場合の値ではない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	幅は 2.64 倍である
