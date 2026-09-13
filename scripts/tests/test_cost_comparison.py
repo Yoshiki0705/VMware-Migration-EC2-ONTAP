@@ -30,6 +30,7 @@ from cost_comparison import (  # noqa: E402
     SSD_DECREASE_SUPPORTED,
     SSD_INCLUDED_IOPS_PER_GB,
     SSD_UTILIZATION_TARGET,
+    TIERING_POLICIES,
     TRANSFER_DIRECTIONS_PER_REPLICATED_GB,
     TRANSFER_RATES,
     VOLUME_SPECS,
@@ -52,6 +53,7 @@ from cost_comparison import (  # noqa: E402
     io2_violations,
     single_az_transfer_breakeven_gb,
     size_fsxn_capacity,
+    tiering_effective,
 )
 
 # ---------------------------------------------------------------- リクエスト課金
@@ -654,3 +656,81 @@ def test_transfer_and_snapshot_rates_carry_provenance():
         for key, rate in table.items():
             assert rate.sku, f"{name}/{key}"
             assert rate.usagetype, f"{name}/{key}"
+
+
+# ---------------------------------------------------------------- 階層化の成立条件
+
+# **階層化は「設定すれば効く」レバーではない。** ブロックでこれを読み違えると、
+# 逆転点そのものが消える。ここで固定するのは、その条件である。
+
+
+def test_default_tiering_policy_differs_by_creation_path():
+    """**コンソールは auto、CLI / API / ONTAP CLI は snapshot-only。**
+
+    IaC と ONTAP CLI で作るブロック構成は既定が snapshot-only になる。
+    """
+    assert "コンソール" in TIERING_POLICIES["auto"].default_for
+    assert "CLI" in TIERING_POLICIES["snapshot-only"].default_for
+    assert TIERING_POLICIES["auto"].tiers_active_data is True
+    assert TIERING_POLICIES["snapshot-only"].tiers_active_data is False
+
+
+def test_snapshot_only_ignores_the_hot_ratio():
+    """**アクティブなデータを階層化しないポリシーでは hot 比率が成立しない。**"""
+    s = size_fsxn_capacity(20480, 0.30, hot_ratio=0.2, tiering_policy="snapshot-only")
+    assert s["requested_hot_ratio"] == 0.2
+    assert s["effective_hot_ratio"] == 1.0
+    assert s["capacity_pool_gb"] == 0
+    assert any("階層化しない" in n for n in s["policy_notes"])
+
+
+def test_tiering_does_not_happen_below_fifty_percent_utilization():
+    """**余裕を持って確保すると階層化が起きず、全量が SSD 単価で課金される。**"""
+    assert tiering_effective("auto", 0.80)["tiers_active_data"] is True
+    assert tiering_effective("auto", 0.50)["tiers_active_data"] is False
+    assert tiering_effective("auto", 0.30)["tiers_active_data"] is False
+    # all だけは 50% 以下でも階層化する
+    assert tiering_effective("all", 0.30)["tiers_active_data"] is True
+
+
+def test_high_utilization_stops_promotion_and_then_writes():
+    at_90 = tiering_effective("auto", 0.90)
+    assert any("SSD に戻りません" in r for r in at_90["reasons"])
+    at_98 = tiering_effective("auto", 0.98)
+    assert any("書き込めなくなります" in r for r in at_98["reasons"])
+
+
+def test_auto_promotes_cold_blocks_on_random_read():
+    """**LUN 上のファイルシステムはランダム読みを行う。** hot 比率は設計値では決まらない。"""
+    assert TIERING_POLICIES["auto"].promotes_on_random_read is True
+    assert TIERING_POLICIES["all"].promotes_on_random_read is False
+
+
+def test_block_assumption_removes_the_crossover():
+    """**階層化しない前提では逆転点が存在しない。** ブロックでの結論である。"""
+    with_tiering = find_capacity_crossover(512, hot_ratio=0.20)
+    without = find_capacity_crossover(512, hot_ratio=1.0)
+    assert with_tiering is not None
+    assert without is None
+
+
+def test_snapshot_only_is_more_expensive_than_gp3_at_every_size_tested():
+    for logical in (2048, 20480, 51200, 204800):
+        f = calculate_fsxn_cost(
+            logical, 512, hot_ratio=0.2, iops=5000, tiering_policy="snapshot-only"
+        )
+        e = calculate_ebs_cost("gp3", logical, iops=5000, throughput_mbps=512)
+        assert f["total_monthly_usd"] > e["total_monthly_usd"], logical
+
+
+def test_unknown_tiering_policy_is_rejected():
+    with pytest.raises(ValueError, match="unknown tiering policy"):
+        tiering_effective("sometimes", 0.8)
+
+
+def test_report_warns_against_assuming_tiering_for_block():
+    report = generate_comparison_report(20480, 512, 0.30, 5000, hot_ratio=0.2)
+    assert "## ブロックストレージで階層化を前提にしないこと" in report
+    assert "snapshot-only" in report
+    assert "space-allocation" in report
+    assert "実測値ではありません" in report
