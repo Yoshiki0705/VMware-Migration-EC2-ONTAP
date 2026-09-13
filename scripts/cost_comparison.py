@@ -168,6 +168,91 @@ EFFICIENCY_BY_WORKLOAD: dict[str, float] = {
 # 出典: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/limits.html
 SSD_UTILIZATION_TARGET = 0.80
 
+# ------------------------------------------------------------------------------
+# 階層化ポリシーと、階層化が起きる条件
+#
+# **階層化は「設定すれば効く」レバーではない。** 効くかどうかはポリシーと SSD 使用率で決まる。
+# ブロックストレージでこれを読み違えると、確保量の前提が崩れる。
+#
+# 出典: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/volume-storage-capacity.html
+# ------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TieringPolicy:
+    """階層化ポリシー 1 つ。**アクティブなデータを動かすかどうかが要点。**
+
+    Attributes:
+        tiers_active_data: LUN やファイルの現用データを容量プールへ動かすか
+        tiers_snapshots: スナップショットを動かすか
+        default_for: このポリシーが既定になる作成経路
+        cooling_days_default: 既定の冷却期間
+        promotes_on_random_read: 冷えたブロックがランダム読みで SSD に戻るか
+    """
+
+    tiers_active_data: bool
+    tiers_snapshots: bool
+    default_for: str
+    cooling_days_default: int | None
+    promotes_on_random_read: bool
+
+
+TIERING_POLICIES: dict[str, TieringPolicy] = {
+    # **作成経路で既定が違う。** コンソールは auto、CLI / API / ONTAP CLI は snapshot-only。
+    # IaC と ONTAP CLI で作るブロック構成は、既定が snapshot-only になる。
+    "auto": TieringPolicy(True, True, "Amazon FSx コンソール", 31, True),
+    "snapshot-only": TieringPolicy(False, True, "AWS CLI / FSx API / ONTAP CLI", 2, True),
+    "all": TieringPolicy(True, True, "（既定にならない）", None, False),
+    "none": TieringPolicy(False, False, "（既定にならない）", None, False),
+}
+
+# **SSD 使用率で階層化の挙動が変わる。** 50% 以下では auto と snapshot-only は階層化しない。
+TIERING_THRESHOLD_NO_TIERING = 0.50
+TIERING_THRESHOLD_NO_PROMOTION = 0.90
+TIERING_THRESHOLD_ALL_STOPS = 0.98
+
+
+def tiering_effective(policy: str, ssd_utilization: float) -> dict:
+    """このポリシーと SSD 使用率で、アクティブなデータが実際に階層化されるか。
+
+    **`all` 以外は SSD 使用率が 50% 以下だと階層化されない。** 余裕を持って SSD を確保すると
+    階層化が起きず、全部が SSD 単価で課金される。逆に使用率を上げると階層化は働くが、
+    90% 以上では冷えたデータが読まれても SSD に戻らなくなり、98% 以上で書けなくなる。
+    """
+    if policy not in TIERING_POLICIES:
+        raise ValueError(f"unknown tiering policy: {policy}. {sorted(TIERING_POLICIES)} のいずれか")
+    p = TIERING_POLICIES[policy]
+    reasons: list[str] = []
+    tiers = p.tiers_active_data
+
+    if not p.tiers_active_data:
+        reasons.append(
+            f"**`{policy}` はアクティブなデータを階層化しません。**"
+            + ("スナップショットのみが対象です。" if p.tiers_snapshots else "")
+        )
+    elif policy != "all" and ssd_utilization <= TIERING_THRESHOLD_NO_TIERING:
+        tiers = False
+        reasons.append(
+            f"**SSD 使用率 {ssd_utilization:.0%} は 50% 以下なので、`{policy}` は階層化しません。**"
+            "余裕を持って確保すると階層化が起きず、全量が SSD 単価で課金されます"
+        )
+    if ssd_utilization >= TIERING_THRESHOLD_ALL_STOPS:
+        reasons.append("**SSD 使用率 98% 以上で階層化が停止し、書き込めなくなります。**")
+    elif ssd_utilization >= TIERING_THRESHOLD_NO_PROMOTION:
+        reasons.append(
+            "SSD 使用率 90% 以上では、冷えたデータが読まれても SSD に戻りません（性能に影響）"
+        )
+    return {
+        "policy": policy,
+        "ssd_utilization": round(ssd_utilization, 3),
+        "tiers_active_data": tiers,
+        "tiers_snapshots": p.tiers_snapshots,
+        "promotes_on_random_read": p.promotes_on_random_read,
+        "default_for": p.default_for,
+        "reasons": reasons,
+    }
+
+
 # 階層化した先のメタデータは SSD に残る。**容量プール 10 GiB につき SSD 1 GiB を見込む。**
 # 出典: 上記サイジングブログの推奨比
 POOL_METADATA_RATIO = 0.10
@@ -524,6 +609,7 @@ def size_fsxn_capacity(
     efficiency_ratio: float = EFFICIENCY_BY_WORKLOAD["vm"],
     hot_ratio: float = 1.0,
     utilization_target: float = SSD_UTILIZATION_TARGET,
+    tiering_policy: str = "auto",
 ) -> dict:
     """論理容量から、確保すべき SSD と容量プールを出す。
 
@@ -544,11 +630,33 @@ def size_fsxn_capacity(
         raise ValueError("hot_ratio は 0 <= x <= 1")
 
     physical_gb = logical_gb * efficiency_ratio
-    hot_gb = physical_gb * hot_ratio
-    cold_gb = physical_gb * (1 - hot_ratio)
+
+    # **ポリシーがアクティブなデータを動かさないなら、hot_ratio は成立しない。**
+    # snapshot-only と none は現用データを階層化しないので、全量が SSD に残る。
+    policy = TIERING_POLICIES[tiering_policy]
+    effective_hot_ratio = hot_ratio
+    policy_notes: list[str] = []
+    if not policy.tiers_active_data and hot_ratio < 1.0:
+        effective_hot_ratio = 1.0
+        policy_notes.append(
+            f"**`{tiering_policy}` はアクティブなデータを階層化しないため、"
+            f"hot {hot_ratio:.0%} の指定を無視して全量を SSD に置きました。**"
+        )
+
+    hot_gb = physical_gb * effective_hot_ratio
+    cold_gb = physical_gb * (1 - effective_hot_ratio)
     pool_metadata_gb = cold_gb * POOL_METADATA_RATIO
     ssd_needed_gb = (hot_gb + pool_metadata_gb) / utilization_target
     provisioned_ssd_gb = max(float(MIN_SSD_GIB), ssd_needed_gb)
+
+    # 実際の使用率で、階層化が起きるかを判定する。**最小 SSD の床に当たると使用率が下がり、
+    # 50% を割って階層化が起きなくなることがある。**
+    actual_utilization = (
+        (hot_gb + pool_metadata_gb) / provisioned_ssd_gb if provisioned_ssd_gb else 0.0
+    )
+    tiering = tiering_effective(tiering_policy, actual_utilization)
+    if cold_gb > 0 and not tiering["tiers_active_data"]:
+        policy_notes.extend(tiering["reasons"])
 
     return {
         "logical_gb": logical_gb,
@@ -559,6 +667,13 @@ def size_fsxn_capacity(
         "ssd_needed_gb": round(ssd_needed_gb, 1),
         "provisioned_ssd_gb": round(provisioned_ssd_gb, 1),
         "at_minimum_floor": ssd_needed_gb < MIN_SSD_GIB,
+        "tiering_policy": tiering_policy,
+        "requested_hot_ratio": hot_ratio,
+        "effective_hot_ratio": effective_hot_ratio,
+        "actual_ssd_utilization": round(actual_utilization, 3),
+        # **アクティブなデータが実際に容量プールへ動くか。** ポリシーが動かさない場合は False。
+        "tiering_actually_happens": tiering["tiers_active_data"],
+        "policy_notes": policy_notes,
     }
 
 
@@ -571,6 +686,7 @@ def calculate_fsxn_cost(
     iops: int = 0,
     pool_read_requests_millions: float = 0.0,
     pool_write_requests_millions: float = 0.0,
+    tiering_policy: str = "auto",
 ) -> dict:
     """FSx for ONTAP の月額コスト。確保量は `size_fsxn_capacity` で出す。
 
@@ -592,7 +708,9 @@ def calculate_fsxn_cost(
         raise ValueError(f"unknown deployment: {deployment}. {sorted(FSXN_RATES)} のいずれか")
     r = FSXN_RATES[deployment]
 
-    sizing = size_fsxn_capacity(data_size_gb, efficiency_ratio, hot_ratio)
+    sizing = size_fsxn_capacity(
+        data_size_gb, efficiency_ratio, hot_ratio, tiering_policy=tiering_policy
+    )
     provisioned_ssd_gb = sizing["provisioned_ssd_gb"]
     physical_size_gb = sizing["physical_gb"]
     capacity_pool_gb = sizing["capacity_pool_gb"]
@@ -621,6 +739,11 @@ def calculate_fsxn_cost(
         "hot_ratio": hot_ratio,
         "pool_metadata_gb": sizing["pool_metadata_gb"],
         "ssd_decrease_supported": SSD_DECREASE_SUPPORTED[deployment],
+        "tiering_policy": tiering_policy,
+        "tiering_actually_happens": sizing["tiering_actually_happens"],
+        "actual_ssd_utilization": sizing["actual_ssd_utilization"],
+        "effective_hot_ratio": sizing["effective_hot_ratio"],
+        "policy_notes": sizing["policy_notes"],
         "capacity_pool_gb": round(capacity_pool_gb, 1),
         "throughput_mbps": throughput_mbps,
         "included_iops": included_iops,
@@ -1270,6 +1393,7 @@ def generate_comparison_report(
     iops: int,
     deployment: str = "MULTI_AZ_1",
     hot_ratio: float = 1.0,
+    tiering_policy: str = "auto",
     pool_read_requests_millions: float = 0.0,
     pool_write_requests_millions: float = 0.0,
 ) -> str:
@@ -1280,6 +1404,7 @@ def generate_comparison_report(
         deployment=deployment,
         efficiency_ratio=efficiency_ratio,
         hot_ratio=hot_ratio,
+        tiering_policy=tiering_policy,
         iops=iops,
         pool_read_requests_millions=pool_read_requests_millions,
         pool_write_requests_millions=pool_write_requests_millions,
@@ -1526,6 +1651,87 @@ def generate_comparison_report(
     for spec in VOLUME_SPECS.values():
         a(f"| {spec.label} | {spec.note} |")
     a("")
+    a("## ブロックストレージで階層化を前提にしないこと")
+    a("")
+    a("**この計算の逆転は階層化が効くことに依存しています。** ブロック（iSCSI / NVMe の LUN）では")
+    a("その前提が成立しないことが多く、**成立しない場合は逆転点が存在しません。**")
+    a("")
+    a("| 条件 | 効果 |")
+    a("|---|---|")
+    a(
+        "| **作成経路で既定のポリシーが違う** | コンソールは `auto`、"
+        "**AWS CLI / FSx API / ONTAP CLI は `snapshot-only`**。"
+        "IaC と ONTAP CLI で作るブロック構成は既定が `snapshot-only` になる |"
+    )
+    a(
+        "| **`snapshot-only` はアクティブなデータを階層化しない** | "
+        "対象はスナップショットだけ。**LUN の現用データは SSD に残る**ので、"
+        "hot 比率の指定に意味がなくなる |"
+    )
+    a(
+        f"| **SSD 使用率 {TIERING_THRESHOLD_NO_TIERING:.0%} 以下では階層化されない** | "
+        "`auto` と `snapshot-only` は階層化を行わない。**余裕を持って SSD を確保すると"
+        "階層化が起きず、全量が SSD 単価で課金される** |"
+    )
+    a(
+        f"| **SSD 使用率 {TIERING_THRESHOLD_NO_PROMOTION:.0%} 以上で戻らない** | "
+        "冷えたデータが読まれても SSD に戻らない。"
+        f"{TIERING_THRESHOLD_ALL_STOPS:.0%} 以上で階層化が停止し、書き込めなくなる |"
+    )
+    a(
+        "| **`auto` はランダム読みで SSD に戻す** | LUN の上のファイルシステムはランダム読みを"
+        "行う。**冷えたブロックが読まれるたびに SSD へ戻るので、hot 比率は設計値ではなく"
+        "ホストのアクセスパターンで決まる** |"
+    )
+    a(
+        "| **後処理圧縮は既定で無効** | ONTAP では性能影響のため既定で無効。"
+        "有効化には診断権限が必要。**公表の削減率をそのまま前提にできない** |"
+    )
+    a("")
+    block = calculate_fsxn_cost(
+        data_size_gb,
+        throughput_mbps,
+        deployment=deployment,
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=hot_ratio,
+        iops=iops,
+        tiering_policy="snapshot-only",
+    )
+    gp3_ref = calculate_ebs_cost("gp3", data_size_gb, iops=iops, throughput_mbps=throughput_mbps)
+    a(f"同じ条件を `snapshot-only` で計算すると **${block['total_monthly_usd']:,.2f}** です")
+    a(f"（`{fsxn['tiering_policy']}` では ${fsxn['total_monthly_usd']:,.2f}）。")
+    a(f"EBS gp3 は ${gp3_ref['total_monthly_usd']:,.2f} なので、")
+    if block["total_monthly_usd"] > gp3_ref["total_monthly_usd"]:
+        a(
+            f"**階層化しない前提では FSx for ONTAP のほうが "
+            f"{block['total_monthly_usd'] / gp3_ref['total_monthly_usd']:.2f} 倍高くなります。**"
+        )
+    else:
+        a("**階層化しない前提でも FSx for ONTAP のほうが安くなります。**")
+    a("")
+    no_tiering_crossover = find_capacity_crossover(
+        throughput_mbps,
+        deployment=deployment,
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=1.0,
+        iops=iops,
+    )
+    if no_tiering_crossover is None:
+        a("**階層化しない前提では、探索範囲（論理 2 PB まで）に逆転する容量がありません。**")
+        a("容量単価だけで FSx for ONTAP を選ぶ根拠は、ブロックでは成立しません。")
+    else:
+        a(f"階層化しない前提での逆転点は論理 {no_tiering_crossover:,} GB です。")
+    a("")
+    a("**LUN 特有の前提も 2 つあります。**")
+    a("")
+    a("- **ボリュームは LUN より 5% 以上大きく**取ります（スナップショットの領域）")
+    a("- **`space-allocation` を有効にしないと、ホスト側の削除で領域が返りません。**")
+    a("  返らない領域は効率化と階層化の前提を崩します")
+    a("")
+    a("> **期待値の置き方。** 階層化による削減を見込むなら、**ポリシー・SSD 使用率・")
+    a("> ホストのアクセスパターンの 3 つを測ってから**見込んでください。")
+    a("> このレポートの hot 比率は入力値で、**実測値ではありません。**")
+    a("")
     a("## 可用性を揃えた比較（99.99%）")
     a("")
     a("**EBS で Region-Level SLA の 99.99% を満たすには、2 つ以上の AZ に")
@@ -1669,6 +1875,12 @@ def main() -> int:
         default=1.0,
         help="SSD に置く割合。残りを容量プールへ階層化する。測るべき値で既定に根拠は無い",
     )
+    p.add_argument(
+        "--tiering-policy",
+        choices=sorted(TIERING_POLICIES),
+        default="auto",
+        help="階層化ポリシー。**ブロックでは CLI / API 既定の snapshot-only を想定すること**",
+    )
     p.add_argument("--iops", type=int, default=5000, help="必要 IOPS")
     p.add_argument(
         "--pool-read-requests-millions",
@@ -1724,6 +1936,7 @@ def main() -> int:
         iops=args.iops,
         deployment=args.deployment,
         hot_ratio=args.hot_ratio,
+        tiering_policy=args.tiering_policy,
         pool_read_requests_millions=args.pool_read_requests_millions,
         pool_write_requests_millions=args.pool_write_requests_millions,
     )

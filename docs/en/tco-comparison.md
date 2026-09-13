@@ -14,6 +14,12 @@ Amazon FSx for NetApp ONTAP.
 line is set almost entirely by throughput capacity: **14.0 TiB logical** at Multi-AZ with
 512 MB/s, and **6.5 TiB logical** at Single-AZ with 512 MB/s.
 
+> **This reversal assumes tiering is effective (the `auto` policy).**
+> **For block — iSCSI or NVMe LUNs — that assumption often does not hold, and where it does not,
+> no crossover exists.** Read
+> [why tiering should not be assumed for block storage](#why-tiering-should-not-be-assumed-for-block-storage)
+> first.
+
 | Scenario (logical capacity / 5,000 IOPS / 512 MB/s) | EBS only | EBS + FSx for ONTAP | Difference |
 |---|---|---|---|
 | 1,024 GB, no tiering (Multi-AZ) | $133.68 | $1,164.29 | +771% |
@@ -265,6 +271,59 @@ does have ceilings, however.
 
 `scripts/cost_comparison.py` detects configurations that violate these and **prints the cost
 while marking it undeliverable.**
+
+## Why tiering should not be assumed for block storage
+
+**The reversal in this document depends on tiering being effective.** For block (iSCSI or NVMe LUNs)
+that assumption often does not hold, and **where it does not hold, no crossover exists.** The
+conclusion table at the top assumes `auto`; read this section first if the target is block.
+
+| Condition | Effect |
+|---|---|
+| **The default policy depends on the creation path** | `auto` from the console, **`snapshot-only` from the AWS CLI, FSx API and ONTAP CLI**. Block configurations built with CloudFormation or the ONTAP CLI default to `snapshot-only` |
+| **`snapshot-only` does not tier active data** | Only snapshots are tiered. **A LUN's live data stays on SSD**, so specifying a hot ratio means nothing |
+| **No tiering at or below 50% SSD utilization** | `auto` and `snapshot-only` do not tier at that level. **Provisioning generously prevents tiering, and the whole footprint is billed at the SSD rate** |
+| **No promotion at or above 90%** | Cold data is not brought back to SSD when read. At 98% tiering stops and writes fail |
+| **`auto` promotes on random read** | A file system on a LUN issues random reads. **Every read of a cold block returns it to SSD, so the hot ratio is set by the host's access pattern, not by design** |
+| **Post-process compression is off by default** | Disabled in ONTAP because of its performance impact, and enabling it needs diagnostic privilege. **The published reduction figures cannot be assumed as-is** |
+
+Source: [Volume storage capacity](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/volume-storage-capacity.html).
+
+### The figures without tiering
+
+Same conditions — 20 TiB logical, 5,000 IOPS, 512 MB/s, 70% efficiency:
+
+| Policy | Provisioned SSD | Capacity pool | Monthly | Against EBS gp3 |
+|---|---|---|---|---|
+| `auto` (20% hot) | 2,150 GB | 4,915 GB | $1,652.72 | **0.83x (FSx cheaper)** |
+| **`snapshot-only`** | **7,680 GB** | **0 GB** | **$3,077.63** | **1.54x (FSx more expensive)** |
+| (reference) EBS gp3 | — | — | $1,996.66 | 1.00 |
+
+**Without tiering, no crossover exists up to 2 PB logical.** Choosing FSx for ONTAP on capacity price
+alone does not hold for block.
+
+### LUN-specific assumptions
+
+- **Size the volume at least 5% larger than the LUN** for snapshot space. The
+  [EVS datastore procedure](https://docs.aws.amazon.com/evs/latest/userguide/config-fsx-iscsi-datastore.html)
+  also recommends sizing the LUN at 90% of the volume
+- **Without `space-allocation` enabled, host-side deletes do not return space.** Space that is not
+  returned undermines both the efficiency and the tiering assumptions
+  ([creating a LUN](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/create-iscsi-lun.html))
+
+### Setting the expectation
+
+**Measure these three before counting on a tiering saving.**
+
+| What to measure | What happens if you do not |
+|---|---|
+| The policy | Estimating "only 20% on SSD" while running `snapshot-only` puts the whole footprint on SSD |
+| SSD utilization | At or below 50% nothing tiers. **The more you provision, the less it tiers** — the relationship runs backwards |
+| The host's access pattern | Even `auto` returns blocks to SSD on random reads. Through a LUN, ONTAP cannot see file-level access |
+
+**Every hot ratio in this document is an input, not a measurement.** Running `snapshot-only` for
+database workloads has been reported as practice, but **that is reported practice rather than
+published data.**
 
 ## Comparing at matched availability (99.99%)
 
