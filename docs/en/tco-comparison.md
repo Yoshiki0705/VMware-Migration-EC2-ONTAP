@@ -10,37 +10,61 @@ Amazon FSx for NetApp ONTAP.
 
 ## The conclusion first
 
-**On storage list price alone, the FSx for ONTAP configuration costs more than EBS only.** No
-scenario tested reversed that, and raising the VM count to 200 found no crossover point.
+**EBS is cheaper at small capacity and FSx for ONTAP is cheaper at large capacity.** The dividing
+line is set almost entirely by throughput capacity: **14.0 TiB logical** at Multi-AZ with
+512 MB/s, and **6.5 TiB logical** at Single-AZ with 512 MB/s.
 
-**That said, the price difference does not settle the choice.** FlexClone, SnapMirror and
-multiprotocol access have no equivalent in the EBS configuration, and some performance
-requirements cannot be delivered by a single EBS volume at all. This document goes as far as
-presenting the difference; **choosing between them requires reading the difference and the
-capabilities together.**
-
-| Scenario | EBS only | EBS + FSx for ONTAP | Difference |
+| Scenario (logical capacity / 5,000 IOPS / 512 MB/s) | EBS only | EBS + FSx for ONTAP | Difference |
 |---|---|---|---|
-| One VM, 1,024 GB, 512 MB/s, 5,000 IOPS (Multi-AZ) | $133.68 | $1,164.29 | +$1,030.61 |
-| Same, Single-AZ | $133.68 | $661.60 | +$527.92 |
-| 20 VMs, 100 GB each, 512 MB/s and 5,000 IOPS aggregate (Multi-AZ) | $288.00 | $1,469.63 | +$1,181.63 |
+| 1,024 GB, no tiering (Multi-AZ) | $133.68 | $1,164.29 | +771% |
+| 20,480 GB, 20% hot (Multi-AZ) | $2,001.46 | **$1,657.52** | **−17.2%** |
+| 20,480 GB, 20% hot (Single-AZ) | $2,001.46 | **$908.21** | **−54.6%** |
+| 51,200 GB, 20% hot (Multi-AZ) | $4,950.58 | **$2,976.14** | **−39.9%** |
 
 Monthly USD, with the OS disk (EBS gp3 50 GB) included on both sides.
 
-## Throughput capacity dominates
+**Small configurations cost more because the 1,024 GiB SSD minimum and the throughput capacity
+land as fixed cost.** As capacity grows, efficiency and tiering lower the per-logical-GB rate
+until it crosses over.
 
-**The largest line on an FSx for ONTAP bill is throughput capacity, not storage.** Holding
-1,024 GB fixed and varying only throughput capacity:
+## Effective rate per logical GB
 
-| Throughput capacity | Monthly total | Of which throughput | Share |
-|---|---|---|---|
-| 128 MB/s | $579.27 | $193.41 | 33.4% |
-| 512 MB/s | $1,159.49 | $773.63 | 66.7% |
-| 2,048 MB/s | $3,480.39 | $3,094.53 | 88.9% |
-| 4,096 MB/s | $6,574.92 | $6,189.06 | 94.1% |
+**FSx for ONTAP provisions the SSD that the post-efficiency physical data fits into, not the
+logical capacity.** Volumes are thin provisioned by default, and cold data is tiered to the
+capacity pool. Lining logical capacity up 1:1 against EBS treats a reduction that exists only on
+the FSx side as zero.
 
-**It is billed on the provisioned amount, so it is charged whether or not it is used.** Size
-throughput capacity first, then capacity.
+Capacity-only rate, computed at 100 TB logical so the minimum floor does not distort it:
+
+| Share kept on SSD (hot) | Per logical GB | Against EBS gp3 |
+|---|---|---|
+| 100% (no tiering) | $0.1125 | FSx 1.17x more expensive |
+| 50% | $0.0690 | FSx 1.39x cheaper |
+| 20% | $0.0429 | **FSx 2.24x cheaper** |
+| 10% | $0.0342 | FSx 2.80x cheaper |
+
+Assumptions: 0.30 remaining after efficiency (70% reduction for VM workloads), 1 GiB of SSD
+metadata per 10 GiB tiered, and SSD sized against the 80% utilization recommendation.
+
+**Without tiering, the per-logical-GB rate exceeds EBS.** What produces the reversal is
+efficiency and tiering together; neither alone does it.
+
+## Where the crossover falls
+
+| Throughput capacity | Multi-AZ | Single-AZ |
+|---|---|---|
+| 128 MB/s | 5.8 TiB | 2.9 TiB |
+| 256 MB/s | 7.9 TiB | 4.1 TiB |
+| 512 MB/s | 13.9 TiB | 6.5 TiB |
+| 1,024 MB/s | 27.7 TiB | 11.6 TiB |
+| 2,048 MB/s | 55.2 TiB | 23.1 TiB |
+| 4,096 MB/s | 110.4 TiB | 46.1 TiB |
+
+At 20% hot, 0.30 remaining after efficiency, IOPS within the 3 IOPS/GB allowance.
+
+**The crossover is proportional to throughput capacity**, because that is where the fixed cost
+sits. **Provisioning more throughput capacity than needed pushes the crossover out by the same
+proportion.**
 
 > **The throughput capacity you need cannot be derived by dividing required bandwidth.** In a
 > sibling project's measurements, three environments running the same procedure, the same
@@ -48,57 +72,96 @@ throughput capacity first, then capacity.
 > ([results](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/1bedd45/docs/ja/verification/perf-matrix-results.md#f-3-と再現性の実測)).
 > **This series has not measured it.**
 
-## Multi-AZ versus Single-AZ
+## How efficiency and tiering reach the bill
 
-**"Single-AZ is half price" holds only for capacity and IOPS.**
+**They reach it by reducing what has to be provisioned, not by making provisioned capacity
+cheaper.**
 
-| Item | Multi-AZ | Single-AZ | Ratio |
-|---|---|---|---|
-| SSD storage | $0.300/GB-Mo | $0.150/GB-Mo | 50.0% |
-| Capacity pool | $0.0476/GB-Mo | $0.0238/GB-Mo | 50.0% |
-| SSD IOPS above the included amount | $0.0408/IOPS-Mo | $0.0204/IOPS-Mo | 50.0% |
-| **Throughput capacity** | **$1.511/MBps-Mo** | **$0.906/MBps-Mo** | **60.0%** |
-| Capacity pool requests | same | same | 100% |
-
-Because throughput capacity is most of the total, **switching to Single-AZ does not halve the
-total.** In the one-VM scenario above it went $1,164.29 → $661.60, which is 56.8%.
-
-Choosing Single-AZ means the file system is unavailable during an AZ failure. **It is not a
-choice to make on cost alone.**
-
-## Why storage efficiency does not lower the bill
-
-**Deduplication and compression shrink the data but do not lower the bill by default.** SSD is
-billed on the provisioned amount, so **nothing changes until the provisioned capacity is actually
-reduced.** What is freed remains as billable headroom.
-
-The same applies to ONTAP snapshots. **Snapshots carry no separate charge but consume the SSD
-already provisioned.** They use capacity that is already paid for, which is prepayment rather
-than being free.
-
-The distinction is documented in
-[the FSx for ONTAP Adoption Playbook's provisioned versus consumed note](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/domains/cost/notes/provisioned-versus-consumed.md).
-
-## Capacity pool request charges
-
-Tiering adds request charges on top of capacity pool storage. **Reads and writes differ by
-12.7x.**
-
-| Type | Rate | Per million requests |
+| Feature | Effect on the bill | Source |
 |---|---|---|
-| Read | $0.00037 / 1,000 | $0.37 |
-| Write | $0.0047 / 1,000 | $4.70 |
+| Compression, deduplication, compaction | Physical data shrinks, so less SSD needs provisioning. **70% reduction is the published figure for VMs** | [Managing storage capacity](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-storage-capacity.html) |
+| Thin provisioning | Volumes are thin by default. **What is provisioned is the file system's SSD, not the sum of volume sizes** | [How to size](https://aws.amazon.com/blogs/storage/how-to-size-an-amazon-fsx-for-netapp-ontap-file-system/) |
+| Tiering (FabricPool) | Moves cold data to $0.0476/GB against $0.300/GB on SSD, a factor of 6.3 | [as above](https://aws.amazon.com/blogs/storage/how-to-size-an-amazon-fsx-for-netapp-ontap-file-system/) |
+| Snapshots | No separate charge; they consume provisioned SSD. **The saving comes from tiering and block sharing** | [as above](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-storage-capacity.html) |
+| FlexClone | No copy at creation; only rewritten blocks add capacity | [Cloning](https://aws.amazon.com/blogs/storage/accelerate-development-refresh-cycles-and-optimize-cost-with-amazon-fsx-for-netapp-ontap-cloning) |
 
-**"Tiering cold data down saves money" reverses depending on access frequency.** If the tiered
-data keeps being read, request charges eat the storage price difference.
+AWS's published reduction figures by workload (compression + deduplication):
 
-## The free EBS baseline, and its per-volume ceilings
+| Workload | Compression only | Deduplication only | Both |
+|---|---|---|---|
+| **Virtual servers and desktops** | 55% | 70% | **70%** |
+| General-purpose file shares | 50% | 30% | 65% |
+| Databases | 65–70% | 0% | 65–70% |
+| Engineering data | 55% | 30% | 75% |
+
+**These are AWS's published typical figures, not measurements from this project.** Actual
+reduction depends on the data.
+
+## What clones change
+
+**FlexClone does not copy data at creation.** On the EBS side each clone is an independent
+volume restored from a snapshot, so every clone provisions the full capacity.
+
+2,048 GB in production, 10% rewritten per clone, 512 MB/s, no tiering:
+
+| Clones | EBS billed | EBS monthly | FSx billed | FSx monthly |
+|---|---|---|---|---|
+| 0 | 2,048 GB | $215.18 | 2,048 GB | $1,080.83 |
+| 3 | 8,192 GB | $860.72 | 2,662 GB | $1,080.83 |
+| **5** | 12,288 GB | $1,291.08 | 3,072 GB | **$1,119.23** |
+| 10 | 22,528 GB | $2,366.98 | 4,096 GB | $1,234.43 |
+
+**On these assumptions it crosses over at five clones.** The delta ratio has to be measured;
+**the 10% default has nothing behind it.** How much a development clone is rewritten depends on
+the workload.
+
+## Three values that decide the answer
+
+**The conclusion turns on these three, and none of the defaults has evidence behind it.**
+
+| Value | What it moves | How to determine it |
+|---|---|---|
+| Hot/cold ratio | The per-logical-GB rate, which moves 2.6x between 100% and 20% | AWS suggests analysing access logs and last-access times, asking application owners, and observing a pilot |
+| Remaining ratio after efficiency | Directly changes the SSD to provision | Measure on real data; published figures are typical values |
+| Throughput capacity | Proportional to the crossover; most of the fixed cost | Measure. **Division does not settle it** |
+
+## Constraints, and asymmetries that affect cost
+
+### First-generation file systems cannot decrease SSD
+
+**`MULTI_AZ_1` and `SINGLE_AZ_1` cannot reduce SSD capacity after the fact.** Decrease is
+second-generation only, in steps of at least 9%, and utilization must stay under 80% afterwards
+([source](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/storage-capacity-and-IOPS.html)).
+
+**So realising the efficiency saving means provisioning less from the start.** Over-provisioning
+and trimming later does not work on first-generation. There is also a six-hour cooldown between
+capacity and throughput changes.
+
+### The availability assumptions do not match
+
+**The tables above put Multi-AZ FSx for ONTAP against single-AZ EBS.** Multi-AZ has file servers
+in two AZs and fails over automatically
+([source](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html)). Giving
+the EBS side equivalent availability takes additional machinery whose cost is not included here.
+**The Single-AZ row brings the availability assumption closer to EBS, at the price of the file
+system being unavailable during an AZ failure.**
+
+### Tiering trades latency
+
+Capacity pool latency is tens of milliseconds against sub-millisecond on SSD. **Lowering the hot
+ratio lowers the rate, but reads of tiered data get slower and request charges apply** (read
+$0.00037/1,000, write $0.0047/1,000 — **writes are 12.7x**).
+
+### Boot volumes stay on EBS
+
+**EC2 cannot boot from FSx for ONTAP.** The OS disk is EBS in both configurations, so it does not
+appear in the difference, but it remains in the total.
+
+### The free EBS baseline, and its per-volume ceilings
 
 **Each EBS volume includes 3,000 IOPS and 125 MB/s at no additional charge.** Splitting the same
-aggregate across more volumes multiplies that free allowance, which lowers the EBS bill. FSx for
-ONTAP buys throughput capacity once per file system and does not benefit from that shape.
-
-**A single volume does have ceilings, however.**
+aggregate across more volumes multiplies that allowance and lowers the EBS bill. A single volume
+does have ceilings, however.
 
 | Constraint | Value | Source |
 |---|---|---|
@@ -107,17 +170,13 @@ ONTAP buys throughput capacity once per file system and does not benefit from th
 | gp3 throughput against IOPS | **0.25 MiB/s per provisioned IOPS** (2,000 MiB/s requires 8,000 IOPS) | as above |
 | io2 IOPS | 100–256,000 (**256,000 on Nitro instances only; 32,000 otherwise**) | [CreateVolume](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVolume.html) |
 
-`scripts/cost_comparison.py` detects configurations that violate these ceilings and **still
-prints the cost while marking it undeliverable.** Printing a price alone for such a configuration
-would put a cheap, unreachable number in the EBS column.
+`scripts/cost_comparison.py` detects configurations that violate these and **prints the cost
+while marking it undeliverable.**
 
 ## What this comparison excludes
 
-**What is excluded still appears on the bill.** Each of these either differs between the two
-configurations or cannot be ignored under some conditions.
-
 - **EC2 instance cost**: assumed identical in count and type, so it does not appear in the
-  difference. It is part of the total
+  difference
 - **Backups**: FSx for ONTAP backups are billed on consumption. **A final backup is taken by
   default when a volume is deleted, and it keeps billing if left behind**
   ([teardown](quickstart.md#delete-stack))
@@ -131,15 +190,17 @@ configurations or cannot be ignored under some conditions.
 ## Reproducing this
 
 ```bash
-# Defaults (Multi-AZ, 1,000 GB, 512 MB/s, 5,000 IOPS)
-python3 scripts/cost_comparison.py
+# Defaults (Multi-AZ, VM workload at 70% reduction, no tiering)
+python3 scripts/cost_comparison.py --data-size 20480
 
-# Change the deployment and the requirements
-python3 scripts/cost_comparison.py --deployment SINGLE_AZ_1 --data-size 1024 --iops 5000
+# Tiered at 20% hot, Single-AZ
+python3 scripts/cost_comparison.py --data-size 20480 --hot-ratio 0.2 --deployment SINGLE_AZ_1
 
-# When tiering, pass read and write request counts separately
-python3 scripts/cost_comparison.py --data-size 1024 \
-  --pool-read-requests-millions 500 --pool-write-requests-millions 20
+# With five clones
+python3 scripts/cost_comparison.py --data-size 2048 --clone-count 5 --clone-delta-ratio 0.10
+
+# Switch the efficiency assumption by workload
+python3 scripts/cost_comparison.py --workload database --data-size 20480
 
 # Reconcile the pinned rates against the Price List API (requires AWS credentials)
 python3 scripts/cost_comparison.py --check-prices
