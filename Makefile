@@ -106,6 +106,15 @@ repo-names: ## 散文中のリポジトリ名がいまの名前か（旧名は G
 	$(PYTHON) tools/check_repo_names.py --selftest >/dev/null
 	$(PYTHON) tools/check_repo_names.py
 
+# サポートケースの台帳は生成物。**AWS 認証が必要で、生成先は .private/ なので CI では走らない。**
+# `--check` は差分があれば exit 1 を返すので、状態が動いたかどうかだけを見たいときに使う。
+.PHONY: support-status support-status-check
+support-status: ## サポートケースの状態と応答ログを Support API から再生成（ローカル専用）
+	$(PYTHON) scripts/sync_support_case_status.py
+
+support-status-check: ## 再生成しても現在のファイルと一致するか（差分があれば exit 1）
+	$(PYTHON) scripts/sync_support_case_status.py --check
+
 # `.private/` は gitignore なので CI には無い。**公開面の下書きを含めるのはローカルだけ**で、
 # 既定に入れると「ローカルでは落ちるが CI では緑」になる。公開前の監査で 1 度通す。
 .PHONY: repo-names-private
