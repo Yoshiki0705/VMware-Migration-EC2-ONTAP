@@ -40,14 +40,14 @@
 # Line breaks matter: a probe spanning one never matches. `上限は 1 フローの容量ではない` was
 # rejected as a candidate for exactly that reason and the two strings around it registered instead.
 # **They later recommended that same string as a replacement, describing it as occurring once on one
-# line. Checked at 1bedd45: zero occurrences.** It is still split, now across lines 957-958 of their
-# results file (`**上限は 1 フローの` / `容量ではない。**`), and `git grep` over their whole docs tree
+# line. Checked at 1bedd45 and again at a97a4ec: zero occurrences both times.** It is still split across
+# lines 957-958 of their results file (`**上限は 1 フローの` / `容量ではない。**`), and `git grep` over their docs tree
 # finds it nowhere. Their other suggestion, the already-registered division string, is what stands.
 #
 # ---------------------------------------------------------------------------------------------------
 # FSx-for-ONTAP-Adoption-Playbook
 #
-# Read at 0723101. Two probes, both on the same file, because **that file corrected this repository's
+# Read at bf8b905 (bumped from 0723101). Two probes, both on the same file, because **that file corrected this repository's
 # FlexClone write-up.** The capability document here framed clone-and-test as testing against
 # production data, without recording that a clone of a LUN is crash-consistent and carries no
 # application-level guarantee -- `fsck` or `chkdsk` may run when the clone is mounted. Their note also

@@ -141,7 +141,7 @@ proportion.**
 
 **Mixing generations makes this table unreadable.** Throughput capacity is the only dimension
 whose rate splits by generation; the others are identical (ap-northeast-1, effectiveDate
-2026-07-01, confirmed against the Price List API on 2026-07-17).
+2026-07-01, confirmed against the Price List API on 2026-09-14).
 
 | Dimension | 1st generation | 2nd generation |
 |---|---|---|
@@ -158,7 +158,7 @@ generation.** This document and `cost_comparison.py` calculate the first generat
 > **The throughput capacity you need cannot be derived by dividing required bandwidth.** In a
 > sibling project's measurements, three environments running the same procedure, the same
 > template and the same negotiated result spread 2.64x
-> ([results](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/1bedd45/docs/ja/verification/perf-matrix-results.md#f-3-と再現性の実測)).
+> ([results](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/a97a4ec/docs/ja/verification/perf-matrix-results.md#f-3-と再現性の実測)).
 > **This series has not measured it.**
 
 ## How efficiency and tiering reach the bill
