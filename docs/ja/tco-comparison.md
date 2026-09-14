@@ -135,7 +135,7 @@ hot 20%、効率化後 0.30、IOPS は 3 IOPS/GB の範囲内。
 ### 世代で変わるのはスループット容量の単価のみ
 
 **世代を混ぜると、この表は読めません。** 単価が世代で分かれるのはスループット容量だけで、
-他の次元は同額です（ap-northeast-1、effectiveDate 2026-07-01、2026-07-17 に Price List API
+他の次元は同額です（ap-northeast-1、effectiveDate 2026-07-01、2026-09-14 に Price List API
 で確認）。
 
 | 次元 | 第一世代 | 第二世代 |
@@ -152,7 +152,7 @@ hot 20%、効率化後 0.30、IOPS は 3 IOPS/GB の範囲内。
 
 > **必要なスループット容量を帯域の割り算では決められません。** 姉妹プロジェクトの実測では、
 > 同じ手順・同じテンプレート・同じ交渉結果の 3 環境が 2.64 倍に散っています
-> （[実測](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/1bedd45/docs/ja/verification/perf-matrix-results.md#f-3-と再現性の実測)）。
+> （[実測](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/a97a4ec/docs/ja/verification/perf-matrix-results.md#f-3-と再現性の実測)）。
 > **本シリーズでの実測は未了です。**
 
 ## 効率化と階層化が請求に効く経路
