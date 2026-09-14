@@ -62,14 +62,37 @@ The diagrams are not reproduced; their content is rewritten as configurations.
 **The pattern assumes clones are discarded and recreated each cycle.** Splitting a clone ends the
 sharing, and the capacity benefit goes with it.
 
-> **A clone is crash-consistent and carries no application-level guarantee.** A snapshot of a LUN is
-> crash-consistent by default, so `fsck` or `chkdsk` may run when the clone is mounted. **"Testing
-> against production data" is not "getting production's consistency."** If application consistency is
-> required, arrange a quiesce point separately
-> ([FSx for ONTAP Adoption Playbook: routes from block to file](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/block-to-file-routes.md)).
+> **A clone inherits the consistency of the snapshot it is based on.**
+> FSx for ONTAP snapshots are **crash-consistent by default**, and application consistency requires
+> quiescing the database's I/O
+> ([source](https://aws.amazon.com/blogs/storage/using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap-to-protect-your-sql-server-workloads/)).
+> **So "clones cannot be application-consistent" is not the case.** A clone taken from a quiesced
+> snapshot is application-consistent. See
+> [obtaining application consistency](#obtaining-application-consistency).
 >
 > **What FlexClone removes is the impact on production, not the copy itself.** A host-mediated route
-> still produces one copy.
+> still produces one copy
+> ([FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/block-to-file-routes.md)).
+
+### Obtaining application consistency
+
+**Snapshots created by the default snapshot policy are not application-consistent.** There are two
+approaches, both documented by AWS.
+
+| Approach | Detail | Source |
+|---|---|---|
+| **SnapCenter** | Application plug-ins (SQL Server, Oracle and others) create consistent snapshots and go on to **protect, replicate and clone** them. **No additional licensing** is required to use it with FSx for ONTAP | [SQL Server](https://aws.amazon.com/blogs/storage/using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap-to-protect-your-sql-server-workloads/) / [Oracle](https://aws.amazon.com/blogs/storage/protect-your-oracle-databases-on-amazon-ec2-using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap/) |
+| **Quiesce manually** | For Oracle: `ALTER DATABASE BEGIN BACKUP` → `vol snapshot create` → `ALTER DATABASE END BACKUP`, then carry it to the secondary with `snapmirror update -source-snapshot` and clone there | [Cloning](https://aws.amazon.com/blogs/storage/accelerate-development-refresh-cycles-and-optimize-cost-with-amazon-fsx-for-netapp-ontap-cloning/) |
+
+**Three prerequisites apply when using SnapCenter.**
+
+- **Set the volume's snapshot policy to `none`.** Automatic snapshots are not application-consistent,
+  and mixing them in makes it unclear at recovery time which ones are usable
+- **Separate database workloads across volumes or file systems**
+- **Leave at least 0.5% of volume space for clone metadata**
+
+Source: [Oracle best practices](https://aws.amazon.com/blogs/storage/protect-your-oracle-databases-on-amazon-ec2-using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap/).
+**SnapCenter is unverified in this project.**
 
 ### Pattern B: disaster recovery (Mirror → Test → Activate)
 
@@ -122,6 +145,50 @@ again.** For a 2,048 GB parent, 10% delta, 512 MB/s, no tiering:
 **The secondary breaks down as $153.60 for 1,024 GiB of SSD and $463.87 for throughput capacity —
 throughput is 75% of it.** Neither shrinks because the DR clone is small. **"Clones consume no
 capacity, so DR is cheap" does not follow.**
+
+## DR cost, and the condition under which clones make it cheaper
+
+**"Clones consume no capacity, so DR is cheap" becomes correct once the comparator is named.** The
+conclusion changes with what it is compared against, so here are three.
+
+2,048 GB protected, 70% efficiency, DR side at 512 MB/s and Single-AZ, no tiering:
+
+| Option | Monthly | RPO | RTO | Test without stopping replication |
+|---|---|---|---|---|
+| Backup only (no secondary file system) | **$30.72** | Backup interval | **Restore takes time; no standby** | No |
+| SnapMirror only | $617.47 | 5 min | Minutes | No |
+| **SnapMirror + FlexClone (one DR clone)** | **$617.47** | 5 min | Minutes | **Yes** |
+
+**Two things hold at once.**
+
+**1. The DR clone adds $0.00.** The secondary sits at the 1,024 GiB minimum SSD floor, so one clone's
+delta does not move the bill. **If SnapMirror is already in place, testing DR costs nothing extra.**
+That is the precise sense in which clones make DR cheaper.
+
+**2. That secondary itself is 20.1x backup-only.** Lowering the DR side's throughput capacity narrows
+it but does not close it.
+
+| DR throughput | Backup only | SnapMirror + Clone | Ratio |
+|---|---|---|---|
+| 128 MB/s | $30.72 | $269.57 | 8.8x |
+| 256 MB/s | $30.72 | $385.54 | 12.6x |
+| 512 MB/s | $30.72 | $617.47 | 20.1x |
+
+**So the conditions are these.**
+
+| Condition | Cheaper? |
+|---|---|
+| **A standby at RPO 5 min and RTO minutes is a requirement** | **Yes.** Given that standby, the clone for testing is effectively free |
+| Several environments from the same data (DR test + dev + QA) | **Yes**, because capacity does not multiply with them |
+| RTO is not a requirement (a slow restore is acceptable) | **No.** Backup-only is 8.8–20x cheaper |
+| Does more protected data reverse it? | **No.** The secondary's cost is mostly throughput capacity, which does not scale with data |
+
+**Backup storage is $0.050/GB-month** on consumption, and **storage efficiency is always enabled for
+backup data**. Protecting FSx for ONTAP through AWS Backup rests on that same backup charge.
+
+> **Logically air-gapped vault (LAGV) pricing is separate.** The Price List API returned LAGV warm
+> storage at $0.0575/GB-month for FSx-Windows, FSx-Lustre and FSx-OpenZFS, but **no LAGV entry for
+> FSx for ONTAP was found in that query.** That is "not confirmed by this query", not "unsupported".
 
 ## Capability by capability
 
@@ -183,6 +250,9 @@ were no longer incurred
 | What it does | A sparsely populated cache that fetches only what is needed. Works on-premises ↔ FSx and FSx ↔ FSx |
 | Suits | **Read-intensive workloads with infrequent changes.** Changes to the origin require the cache to refresh |
 | EBS equivalent | None ([source](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)) |
+| **Constraint 1** | **A cache volume cannot be smaller than 50 GB.** Creation fails with `Volumes of this type must be at least 50GB` |
+| **Constraint 2** | **The FSx for ONTAP aggregate is FabricPool-enabled, so creation fails unless a tiered aggregate is explicitly permitted** (`Aggregates not matching FabricPool requirements`). It is off by default |
+| Source | Measured by a sibling project ([FlexCache verification](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/a97a4ec/docs/ja/verification/flexcache-security-style-inheritance.md)). **Not measured here** |
 
 ### Multiprotocol — NFS, SMB, iSCSI and NVMe to the same volume
 

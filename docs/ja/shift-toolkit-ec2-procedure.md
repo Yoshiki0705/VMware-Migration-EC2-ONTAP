@@ -147,7 +147,7 @@
 
 > **`Resource: "*"` の理由と本番向けガイダンス:**
 >
-> - `ec2:Describe*` 系アクションは AWS 仕様上リソースレベル制限に対応していないため `"*"` が必須。
+> - `ec2:Describe*` 系アクションはリソースレベル権限に対応しないため `"*"` が必須。**「AWS 仕様上」ではなく出典で示します**: IAM の[ポリシーのトラブルシューティング](https://docs.aws.amazon.com/IAM/latest/UserGuide/troubleshoot_policies.html)が「`ec2:Describe` アクションはいずれもリソースレベル権限に対応しない」と明記しています。**個別のアクションを絞れるかは[サービス認可リファレンスの Resource types 列](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ec2.html)で確認してください。**
 > - `ec2:CopySnapshot` / `ec2:RegisterImage` / `ec2:ModifySnapshotAttribute` は本番では以下のように絞る:
 >
 > ```json

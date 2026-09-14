@@ -154,7 +154,69 @@ volume clone ... / lun mapping delete ... / volume destroy <dst_vol>_drtest
 
 ---
 
-## 8. リスクと注意
+## 8. 撤去手順（3.2 の解除）
+
+**3.2 でピアを作ったなら、撤去でも解除が必要です。** 解除せずに FSx for ONTAP のスタックを
+削除すると止まります。姉妹プロジェクトが 2026-09-13 に実測した内容です
+（ONTAP 9.18.1P6、ap-northeast-1。
+[出典](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/a97a4ec/docs/ja/verification/flexcache-security-style-inheritance.md)）。
+
+> **ホストが生きているうちにピアを解除してください。** 順序を間違えると、解除を打てる唯一の
+> ホストを同じスタック削除が先に消します。
+
+### 8.1 正しい順序
+
+```text
+# 1) SnapMirror 関係を解除する（宛先側）
+snapmirror delete -destination-path <fsxn-svm>:<dest-volume>
+snapmirror release -destination-path <fsxn-svm>:<dest-volume>   # source 側
+
+# 2) SVM ピアを解除する（**ホストが生きているうちに**）
+vserver peer delete -vserver <onprem-svm> -peer-vserver <fsxn-svm>
+
+# 3) クラスタピアを解除する
+cluster peer delete -peer-cluster <fsxn-cluster>
+
+# 4) 手で足した SG ルールを消す（別スタックの SG を参照している ingress）
+#    残すと参照先 SG の削除が「依存オブジェクトがある」で落ちます
+
+# 5) スタックを削除する
+aws cloudformation delete-stack --stack-name <stack>
+```
+
+### 8.2 順序を間違えた場合の復旧
+
+**4 段階あり、後半 2 つは順序を間違えてからしか現れません。**
+
+| 段階 | 症状 |
+|---|---|
+| 1 | SVM ピアが残っていると FSx for ONTAP は SVM を削除せず、スタックが `svmLifecycle should be DELETING, but get: MISCONFIGURED` で `DELETE_FAILED` になります |
+| 2 | **`vserver peer delete` を打てる唯一のホストを、同じスタック削除が先に消します。** 管理 LIF はプライベートアドレスなので、検証ホストが消えると REST でも CLI でも到達できません |
+| 3 | ピアを消しても `Lifecycle` は `MISCONFIGURED` のまま残り、**CloudFormation はこの値を見て削除を呼ぶ前に断ります** |
+| 4 | 手で足した SG ルールが、参照先 SG の削除を止めます |
+
+復旧の順序:
+
+```text
+# 1) ONTAP に到達できるホストを立て直す（t3.micro で足ります）
+# 2) ピアを解除する（8.1 の 2〜3）
+# 3) **FSx for ONTAP の API で SVM を直接削除する**
+#    aws fsx delete-storage-virtual-machine は MISCONFIGURED のままでも受け付け、DELETING に入ります
+aws fsx delete-storage-virtual-machine --storage-virtual-machine-id <svm-id>
+# 4) スタック削除を再試行する
+```
+
+### 8.3 最終バックアップの残り方
+
+**削除経路によって残るかが変わります。** 姉妹プロジェクトの実測では、CloudFormation が
+削除した 2 本には最終バックアップが残り、ONTAP REST で削除した 4 本には残りませんでした。
+**撤去後に数えてください。**
+
+```bash
+aws fsx describe-backups --query 'Backups[].{Id:BackupId,Vol:Volume.Name,Type:Type}' --output table
+```
+
+## 9. リスクと注意
 
 | リスク | 影響 | 対策 |
 |--------|------|------|

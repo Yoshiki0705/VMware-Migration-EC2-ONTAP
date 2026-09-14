@@ -65,7 +65,8 @@
 # ---------------------------------------------------------------------------------------------------
 # S3-Burst-on-ONTAP-Files
 #
-# Read at 1bedd45. **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
+# Read at a97a4ec (bumped from 1bedd45; the diff touching cited files is 2 files / 7 lines and the
+# anchors still resolve). **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
 # earlier note here, that F-2 and F-3 were not run, was true at f27363c and is kept only as the
 # reason the probe set was extended rather than written at once.
 #
@@ -104,9 +105,22 @@
 # `9.08 Gbps を運んでおり、同じ上限には当たっていない` (the same absence in the comparison section).
 # Rewording either now fails rather than half-failing silently.
 #
-# `倍率を書かない` is registered as `reread`, not `retraction`. It is the sentence that licenses this
-# repository's refusal to quote a protocol ratio. If it goes, they have most likely measured both
-# protocols on one file system, and the ratio becomes citable -- a reason to reread, not a breakage.
+# `分母と分子が別のファイルシステムから来ており` is registered as `reread`, not `retraction`. It is the
+# sentence that licenses this repository's refusal to quote a protocol ratio. If it goes, they have
+# most likely measured both protocols on one file system, and the ratio becomes citable -- a reason to
+# reread, not a breakage.
+#
+# **It replaced `倍率を書かない`, which they flagged as about to become weak.** Their #168 added
+# `倍率は書かない` to the same file, one particle away, so an edit aligning either to the other would
+# have made this probe match twice and weaken in silence. Both are single-occurrence today; the
+# replacement is the longer sentence on the same line.
+#
+# Three more from their FlexCache verification, all single-occurrence at a97a4ec. The first two are
+# constraints a reader of this repository's FlexCache section would hit at creation time -- a cache
+# volume cannot be smaller than 50 GB, and the FSx for ONTAP aggregate is FabricPool-enabled so
+# creation fails without opting into a tiered aggregate. The third is the teardown ordering that
+# strands the only host able to fix it. `作成後の変更は ONTAP が拒否する` was **not** registered on
+# their advice: it occurs twice there.
 #
 # **No figure is registered as a probe.** `1,135.18` occurs seven times in that file, so a probe on
 # it would pass while the sentence around it changed. The probes are the claim-bearing sentences.
@@ -130,7 +144,10 @@ FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-route
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	アプリケーション側の保証は受けていません
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	「AL2023 では」と一般化しない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	同一ファイルシステム上での iSCSI と NVMe/TCP の比較
-S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	reread	倍率を書かない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	CloudFormation は削除を呼ぶ前にこの値を見て断る
+S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	この種類のボリュームは最低 50 GB
+S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	同じスタック削除が検証ホストを先に消す
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	reread	分母と分子が別のファイルシステムから来ており
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 → 2 では逐次スループットが 1 バイトも動かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	36 を要求しても 4 のままだった
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	9.08 Gbps を運んでおり、同じ上限には当たっていない

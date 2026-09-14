@@ -147,7 +147,7 @@ Before migration, verify that the source VM's guest OS is included in the follow
 
 > **Rationale for `Resource: "*"` and production guidance:**
 >
-> - `ec2:Describe*` actions do not support resource-level restrictions per AWS specifications, so `"*"` is mandatory.
+> - `ec2:Describe*` actions do not support resource-level permissions, so `"*"` is mandatory. **Cited rather than asserted "per AWS specifications"**: IAM's [policy troubleshooting guide](https://docs.aws.amazon.com/IAM/latest/UserGuide/troubleshoot_policies.html) states that none of the `ec2:Describe` actions support resource-level permissions. **For any individual action, check the Resource types column in the [service authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ec2.html).**
 > - For production, scope `ec2:CopySnapshot` / `ec2:RegisterImage` / `ec2:ModifySnapshotAttribute` as follows:
 >
 > ```json
