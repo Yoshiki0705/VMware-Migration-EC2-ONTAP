@@ -129,9 +129,11 @@ def main() -> int:
             continue
 
         probes, problems = parse(body)
-        if problems:
-            # Their contract, their format. Reported rather than enforced.
-            notes.append(f"{repo}: contract has {len(problems)} format problem(s)")
+        for problem in problems:
+            # Their contract, their format: reported rather than enforced. **Named, not counted** --
+            # "1 format problem" sends the reader to run a parser by hand, which is the shape this
+            # whole exchange keeps finding.
+            notes.append(f"{repo}: their contract, {problem}")
         siblings_read.append(repo)
 
         for probe in (p for p in probes if p.repo == THIS_REPO):

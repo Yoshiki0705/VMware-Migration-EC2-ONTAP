@@ -201,3 +201,37 @@ def test_strict_passes_when_everything_was_read_at_the_published_ref(tmp_path: P
     strict = run_strict(tmp_path, make_contract(tmp_path))
     assert strict.returncode == 0, strict.stdout
     assert "--strict" not in strict.stdout
+
+
+def test_a_probe_matching_twice_is_reported_as_weak(tmp_path: Path) -> None:
+    """Weak anchor, not a withdrawn claim: reported, and the run still passes.
+
+    Hand-counting occurrences is what caught two weak probes in this exchange, and hand-counting
+    held only because somebody remembered to do it.
+    """
+    body = f"**{CLAIM}。**\n\nあとで同じ文が出ます。{CLAIM}\n"
+    make_checkout(tmp_path, committed=body, worktree=body)
+    result = run(tmp_path, make_contract(tmp_path))
+    assert result.returncode == 0, result.stdout
+    assert "occurs 2 times" in result.stdout
+    assert "leaves this check green" in result.stdout
+
+
+def test_a_single_occurrence_is_not_reported_as_weak(tmp_path: Path) -> None:
+    """The boundary. Written so that removing the detection leaves this test passing -- if it
+    failed too, the pair would only prove that the checker prints something."""
+    body = f"**{CLAIM}。**\n"
+    make_checkout(tmp_path, committed=body, worktree=body)
+    result = run(tmp_path, make_contract(tmp_path))
+    assert result.returncode == 0, result.stdout
+    assert "occurs" not in result.stdout
+    assert "weak" not in result.stdout
+
+
+def test_weakness_is_reported_for_a_reread_probe_too(tmp_path: Path) -> None:
+    """The count is a property of the anchor, so it does not depend on the role."""
+    body = f"{CLAIM}\n{CLAIM}\n{CLAIM}\n"
+    make_checkout(tmp_path, committed=body, worktree=body)
+    result = run(tmp_path, make_contract(tmp_path, role="reread"))
+    assert result.returncode == 0, result.stdout
+    assert "occurs 3 times" in result.stdout
