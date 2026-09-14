@@ -259,12 +259,23 @@ def main() -> int:
             )
             continue
         checked += 1
-        if probe.probe in body:
+        occurrences = body.count(probe.probe)
+        if occurrences == 0:
+            message = (
+                f"{probe.repo}: {probe.path} no longer contains {probe.probe!r} (line {probe.line})"
+            )
+            (failures if probe.role == FAIL_ROLE else warnings).append(message)
             continue
-        message = (
-            f"{probe.repo}: {probe.path} no longer contains {probe.probe!r} (line {probe.line})"
-        )
-        (failures if probe.role == FAIL_ROLE else warnings).append(message)
+        if occurrences > 1:
+            # Reported, not failed. The claim still resolves; what is weak is the anchor. Failing
+            # on it would put "the claim was withdrawn" and "this string is a fragile anchor" behind
+            # the same red, and they need different work. Counting this by hand is what caught
+            # `倍率を書かない` and `作成後の変更は ONTAP が拒否する`, and hand-counting held only
+            # because somebody remembered to do it.
+            warnings.append(
+                f"{probe.repo}: {probe.probe!r} occurs {occurrences} times in {probe.path} "
+                f"(line {probe.line}), so rewording one occurrence leaves this check green"
+            )
 
     # `--strict` turns the two ways this check can pass without having checked -- a missing
     # checkout, and a read that fell back to the working tree -- into failures. CI passes it.
