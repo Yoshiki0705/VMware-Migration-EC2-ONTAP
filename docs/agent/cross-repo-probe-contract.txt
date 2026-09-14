@@ -66,7 +66,7 @@
 # ---------------------------------------------------------------------------------------------------
 # S3-Burst-on-ONTAP-Files
 #
-# Read at 2fc5f08 (a97a4ec before it; the doc-level pins stay at a97a4ec, where the quoted values and the
+# Read at 7763753 (2fc5f08 and a97a4ec before it; the doc-level pins stay at a97a4ec, where the quoted values and the
 # anchors still resolve). **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
 # earlier note here, that F-2 and F-3 were not run, was true at f27363c and is kept only as the
 # reason the probe set was extended rather than written at once.
