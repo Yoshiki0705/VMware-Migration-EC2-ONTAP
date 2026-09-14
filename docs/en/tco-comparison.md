@@ -11,8 +11,9 @@ Amazon FSx for NetApp ONTAP.
 ## The conclusion first
 
 **EBS is cheaper at small capacity and FSx for ONTAP is cheaper at large capacity.** The dividing
-line is set almost entirely by throughput capacity: **14.0 TiB logical** at Multi-AZ with
-512 MB/s, and **6.5 TiB logical** at Single-AZ with 512 MB/s.
+line is set almost entirely by throughput capacity: **14.0 TiB logical** at Multi-AZ
+(first generation) with 512 MB/s, and **6.5 TiB logical** at Single-AZ (first generation) with
+512 MB/s.
 
 > **This reversal assumes tiering is effective (the `auto` policy).**
 > **For block — iSCSI or NVMe LUNs — that assumption often does not hold, and where it does not,
@@ -121,7 +122,7 @@ efficiency and tiering together; neither alone does it.
 
 ## Where the crossover falls
 
-| Throughput capacity | Multi-AZ | Single-AZ |
+| Throughput capacity | Multi-AZ (1st gen) | Single-AZ (1st gen) |
 |---|---|---|
 | 128 MB/s | 5.8 TiB | 2.9 TiB |
 | 256 MB/s | 7.9 TiB | 4.1 TiB |
@@ -135,6 +136,24 @@ At 20% hot, 0.30 remaining after efficiency, IOPS within the 3 IOPS/GB allowance
 **The crossover is proportional to throughput capacity**, because that is where the fixed cost
 sits. **Provisioning more throughput capacity than needed pushes the crossover out by the same
 proportion.**
+
+### Only the throughput capacity rate changes by generation
+
+**Mixing generations makes this table unreadable.** Throughput capacity is the only dimension
+whose rate splits by generation; the others are identical (ap-northeast-1, effectiveDate
+2026-07-01, confirmed against the Price List API on 2026-07-17).
+
+| Dimension | 1st generation | 2nd generation |
+|---|---|---|
+| Throughput capacity (Multi-AZ) | **$1.511** (`APN1-ThroughputCapacity.MAZ`) | **$3.148** (`APN1-ThroughputCapacity.MAZ2`) |
+| Throughput capacity (Single-AZ) | **$0.906** (`APN1-ThroughputCapacity.SAZ_2N`) | **$2.013** (`APN1-ThroughputCapacity.SAZ_2N2`) |
+| SSD storage | $0.300 / $0.150 | **Same rate** (separate SKUs, `.MAZ2:SSD` / `.SAZ_2N2:SSD`) |
+| SSD IOPS above the allowance | $0.0408 / $0.0204 | **Same rate** (separate SKUs) |
+| Capacity pool and requests | $0.0476 / $0.0238, $0.00037 / $0.0047 per 1,000 | **No second-generation usagetype exists** |
+
+**Most of the fixed cost is throughput capacity, so the crossover moves further out on the second
+generation.** This document and `cost_comparison.py` calculate the first generation only
+(`MULTI_AZ_1` / `SINGLE_AZ_1`); **the second-generation crossover is not computed here.**
 
 > **The throughput capacity you need cannot be derived by dividing required bandwidth.** In a
 > sibling project's measurements, three environments running the same procedure, the same
