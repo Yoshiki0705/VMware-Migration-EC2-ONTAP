@@ -45,6 +45,12 @@ EC2 は AMI（EBS バックド）からのみブート可能で、FSx for ONTAP 
   1. **Amazon EBS Direct APIs**（推奨・最速）: EBS snapshot を直接作成
   2. **AWS VM Import/Export**: VMDK → RAW → S3 アップロード → AMI 変換
   - 現在の Preview リリースでは S3 import/export のみ有効。EBS Direct APIs は次回ドロップで有効化予定。
+  - **2026-09-14 時点で、有効化されたかは未確認。** NetApp の公開ドキュメント（Shift Toolkit の
+    overview、2026-05-26 更新）は移行先に AWS EC2 を挙げていないため、**この経路のリリース状況は
+    公開情報からは判定できない。** Early Preview の窓口に確認する。
+  - **この未確認が効く先**: 実測（2026-06）は S3 経路のもので、合計約 1 時間 49 分のうち
+    S3 アップロード 68 分 + AMI インポート 36 分が 95% を占める。**EBS Direct APIs が有効化されて
+    いれば、この内訳は現在の挙動を表さない。** ブログ第 1 回の該当節もこの前提で書いている。
 
 - **Q2**: ✅ **別ツール併用は不要。** Shift Toolkit がエンドツーエンドで OS→EBS→AMI + Data→FSx for ONTAP LUN を処理する。ワークフロー内で VM Import/Export サービスを内部利用するが、ユーザーが別途ツールを操作する必要はない。
 

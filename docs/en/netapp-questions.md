@@ -45,6 +45,14 @@ Confirming the physical constraint that EC2 can only boot from an AMI (EBS-backe
   1. **Amazon EBS Direct APIs** (recommended, fastest): Creates EBS snapshot directly
   2. **AWS VM Import/Export**: VMDK → RAW → S3 upload → AMI conversion
   - In the current Preview release, only S3 import/export is enabled. EBS Direct APIs will be enabled in the next drop.
+  - **As of 2026-09-14, whether it has been enabled is unverified.** NetApp's public documentation
+    (the Shift Toolkit overview, updated 2026-05-26) does not list AWS EC2 as a target, so **the
+    release status of this path cannot be judged from public sources.** To be confirmed with the
+    Early Preview contact.
+  - **What this unverified point affects**: the measurement (2026-06) is of the S3 path, where
+    68 minutes of S3 upload and 36 minutes of AMI import make up 95% of the roughly 1 hour
+    49 minutes total. **If EBS Direct APIs have been enabled, that breakdown does not describe
+    current behaviour.** The corresponding section of blog part 1 rests on the same assumption.
 
 - **Q2**: ✅ **No separate tool required.** Shift Toolkit processes the end-to-end flow: OS → EBS → AMI + Data → FSx for ONTAP LUN. The workflow uses VM Import/Export internally, but users do not need to operate separate tools.
 
