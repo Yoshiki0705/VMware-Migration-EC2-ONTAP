@@ -266,6 +266,21 @@ def main() -> int:
         )
         (failures if probe.role == FAIL_ROLE else warnings).append(message)
 
+    # `--strict` turns the two ways this check can pass without having checked -- a missing
+    # checkout, and a read that fell back to the working tree -- into failures. CI passes it.
+    # A run that is green because it examined nothing is indistinguishable from a working gate.
+    if "--strict" in sys.argv:
+        if skipped:
+            failures.append(
+                "--strict: " + ", ".join(sorted(skipped)) + " was skipped, so nothing was checked"
+            )
+        if fell_back:
+            failures.append(
+                "--strict: "
+                + ", ".join(sorted(fell_back))
+                + f" was read from the working tree rather than {PUBLISHED_REF}"
+            )
+
     for warning in warnings:
         print(f"outgoing-probes: reread: {warning}")
     for failure in failures:

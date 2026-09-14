@@ -156,3 +156,48 @@ def test_missing_contract_is_not_a_failure(tmp_path: Path, flag: str) -> None:
     )
     assert result.returncode == 0
     assert "nothing cited" in result.stdout
+
+
+def run_strict(sibling_root: Path, contract: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(CHECKER), "--contract", str(contract), "--strict"],
+        capture_output=True,
+        text=True,
+        env={
+            "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+            "SIBLING_ROOT": str(sibling_root),
+        },
+    )
+
+
+def test_strict_fails_on_a_missing_checkout(tmp_path: Path) -> None:
+    """The shape CI must not pass in: nothing was checked and the exit code said fine."""
+    contract = make_contract(tmp_path)
+    lenient = run(tmp_path, contract)
+    assert lenient.returncode == 0
+    assert "A skip is not a pass" in lenient.stdout
+
+    strict = run_strict(tmp_path, contract)
+    assert strict.returncode == 1, strict.stdout
+    assert "--strict" in strict.stdout
+
+
+def test_strict_fails_when_the_read_fell_back(tmp_path: Path) -> None:
+    checkout = tmp_path / REPO
+    (checkout / "docs" / "ja").mkdir(parents=True)
+    (checkout / CITED).write_text(f"**{CLAIM}。**\n", encoding="utf-8")
+    git(checkout, "init", "--quiet", "--initial-branch=main")
+
+    contract = make_contract(tmp_path)
+    assert run(tmp_path, contract).returncode == 0
+
+    strict = run_strict(tmp_path, contract)
+    assert strict.returncode == 1, strict.stdout
+    assert "working tree rather than origin/main" in strict.stdout
+
+
+def test_strict_passes_when_everything_was_read_at_the_published_ref(tmp_path: Path) -> None:
+    make_checkout(tmp_path, committed=f"**{CLAIM}。**\n", worktree=f"**{CLAIM}。**\n")
+    strict = run_strict(tmp_path, make_contract(tmp_path))
+    assert strict.returncode == 0, strict.stdout
+    assert "--strict" not in strict.stdout
