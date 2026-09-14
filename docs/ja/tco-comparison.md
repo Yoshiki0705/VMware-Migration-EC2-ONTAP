@@ -414,6 +414,7 @@ python3 scripts/cost_comparison.py --check-prices
 
 | ドキュメント | 内容 |
 |---|---|
+| [機能と選定要素](ontap-capability-selection-factors.md) | **容量単価では表せない要素。FlexClone、SnapMirror、SnapLock など** |
 | [移行方式の比較](migration-method-comparison.md) | どのツールで移行するか |
 | [クイックスタート](quickstart.md) | 環境の構築と撤去 |
 | [iSCSI セットアップ](fsxn-iscsi-setup.md) | LUN の作成とマウント |
