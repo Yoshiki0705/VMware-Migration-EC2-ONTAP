@@ -56,11 +56,20 @@ The diagrams are not reproduced; their content is rewritten as configurations.
 | Stage | Operation | Where it helps |
 |---|---|---|
 | Clone | Create thin clones of production datasets | No capacity consumed, and the wait is only the creation time |
-| Test | Test on real data without impacting production | **The same data as production.** No need to substitute sample data |
+| Test | Test on real data without impacting production | Production data, but **the consistency is crash-consistent** (below) |
 | Reiterate | Recreate clones to test against current data | **Avoids testing against data that has gone stale** |
 
 **The pattern assumes clones are discarded and recreated each cycle.** Splitting a clone ends the
 sharing, and the capacity benefit goes with it.
+
+> **A clone is crash-consistent and carries no application-level guarantee.** A snapshot of a LUN is
+> crash-consistent by default, so `fsck` or `chkdsk` may run when the clone is mounted. **"Testing
+> against production data" is not "getting production's consistency."** If application consistency is
+> required, arrange a quiesce point separately
+> ([FSx for ONTAP Adoption Playbook: routes from block to file](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/block-to-file-routes.md)).
+>
+> **What FlexClone removes is the impact on production, not the copy itself.** A host-mediated route
+> still produces one copy.
 
 ### Pattern B: disaster recovery (Mirror → Test → Activate)
 

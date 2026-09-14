@@ -45,6 +45,24 @@
 # finds it nowhere. Their other suggestion, the already-registered division string, is what stands.
 #
 # ---------------------------------------------------------------------------------------------------
+# FSx-for-ONTAP-Adoption-Playbook
+#
+# Read at 0723101. Two probes, both on the same file, because **that file corrected this repository's
+# FlexClone write-up.** The capability document here framed clone-and-test as testing against
+# production data, without recording that a clone of a LUN is crash-consistent and carries no
+# application-level guarantee -- `fsck` or `chkdsk` may run when the clone is mounted. Their note also
+# states that what FlexClone removes is the impact on production, not the copy itself, since a
+# host-mediated route still produces one copy.
+#
+# If either string goes, the caveat this repository now carries has lost its source and the FlexClone
+# section needs rereading before it keeps claiming a clone is production-equivalent.
+#
+# They register one probe against this repository in the other direction
+# (`承認を得て実行` in docs/ja/atx-fsxn-ga-verification.md). **That string occurs three times here**,
+# which by their own contract's standard is weak -- rewording one of the three leaves it green. Raised
+# with them rather than silently changed.
+#
+# ---------------------------------------------------------------------------------------------------
 # S3-Burst-on-ONTAP-Files
 #
 # Read at 1bedd45. **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
@@ -108,6 +126,8 @@
 #     bullet disappears they have measured both on one filesystem, and the ratio becomes citable.
 #   - their own instruction not to generalise the missing ANA multipath to "on AL2023". If it
 #     disappears they have recorded the kernel version and the limitation can be stated precisely.
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	FlexClone が省くのは本番への影響です
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	アプリケーション側の保証は受けていません
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	「AL2023 では」と一般化しない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	同一ファイルシステム上での iSCSI と NVMe/TCP の比較
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	reread	倍率を書かない
