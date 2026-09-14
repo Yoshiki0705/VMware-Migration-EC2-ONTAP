@@ -162,10 +162,22 @@
 #   both that FlexClone removes the impact rather than the copy (registered) and that a host-mediated
 #   route still produces one copy (was not).
 #
-# Two rows back statements that currently live only in the blog drafts under `.private/`, which
-# restate more than the tracked documents do: `run の中では安定しているので、測定のばらつきではない`
-# and `どの形状の I/O を測ったかで`. The drafts are a publication surface -- one is already saved as a
-# Hatena draft -- so their basis is registered like any other.
+# Three rows back statements that live only in the blog drafts under `.private/`, which restate more
+# than the tracked documents do: `run の中では安定しているので、測定のばらつきではない`,
+# `どの形状の I/O を測ったかで` and `デプロイ間の再現性を測っていない`. The drafts are a publication
+# surface -- one is already saved as a Hatena draft -- so their basis is registered like any other.
+#
+# **The drafts were then audited on their own axis**, by listing every sibling file they link and
+# checking each restated claim against these rows. They cite two files, both S3-Burst's
+# perf-matrix-results.md and block-measurement-runbook.md, and one claim had no anchor: that iSCSI was
+# measured in a single deployment, so its reproducibility across deployments is unmeasured. Registered
+# above. **Scope is the publication surface, not the tracked state** -- `.private/` is gitignored and
+# so invisible to the repository, but a draft saved to Hatena is published either way.
+#
+# One draft sentence is deliberately not registered: that a 300-second window includes burst. Their
+# published condition is the measurement window; **the inference that it therefore includes burst is
+# this repository's**, so there is nothing of theirs to withdraw. A probe on their heading would
+# report something else.
 #
 # One case that is deliberately not registered: the playbook's `crash-consistent です` half. This
 # repository states the same fact from AWS and NetApp documentation rather than from their note, so
@@ -190,6 +202,7 @@ S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	�
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	どの形状の I/O を測ったかで
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	どれが当たっているかを検証していないので、原因を書かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	セッション数を帯域の割り算で決める形そのものが成立していない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	デプロイ間の再現性を測っていない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	ファイルシステムを載せた場合の値ではない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	上限は 1 フローの容量ではない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	幅は 2.64 倍である

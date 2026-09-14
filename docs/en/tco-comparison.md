@@ -438,7 +438,7 @@ python3 scripts/cost_comparison.py --workload database --data-size 20480
 python3 scripts/cost_comparison.py --check-prices
 ```
 
-**All 19 rates carry a SKU and a usagetype.** `--check-prices` compares each against the API's
+**All 30 rates carry a SKU and a usagetype.** `--check-prices` compares each against the API's
 `pricePerUnit`, prints the item name and both values on any mismatch, and exits 1.
 
 ## Related documents

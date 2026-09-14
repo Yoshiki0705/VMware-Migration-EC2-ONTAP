@@ -10,6 +10,7 @@
 加えて、効率化が既定では請求を下げないこと（確保量課金）を固定する。
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -850,3 +851,31 @@ def test_two_site_total_is_the_sum_of_both_sides():
     assert r["total_monthly_usd"] == pytest.approx(
         r["primary_monthly_usd"] + r["secondary_monthly_usd"], abs=0.01
     )
+
+
+def test_the_documented_rate_count_matches_the_pinned_rates() -> None:
+    """The documents state how many rates carry a SKU. That number is derived, so it goes stale.
+
+    It did: both language versions said 19 while 30 were pinned, because rates were added and the
+    sentence was not. Binding the two here makes the next addition fail instead of ageing quietly.
+    """
+    import cost_comparison as cc
+
+    pinned = (
+        sum(len(rates) for rates in cc.FSXN_RATES.values())
+        + len(cc.EBS_RATES)
+        + len(cc.SNAPSHOT_RATES)
+        + len(cc.BACKUP_RATES)
+        + len(cc.TRANSFER_RATES)
+    )
+    root = Path(__file__).resolve().parents[2]
+    for relative, pattern in (
+        ("docs/ja/tco-comparison.md", r"単価は (\d+) 件すべて SKU と usagetype を持っています"),
+        ("docs/en/tco-comparison.md", r"All (\d+) rates carry a SKU and a usagetype"),
+    ):
+        text = (root / relative).read_text(encoding="utf-8")
+        found = re.search(pattern, text)
+        assert found, f"{relative} no longer states the rate count in the expected form"
+        assert int(found.group(1)) == pinned, (
+            f"{relative} says {found.group(1)} rates, {pinned} are pinned in cost_comparison.py"
+        )
