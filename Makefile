@@ -142,9 +142,14 @@ draft-parity: ## ブログ下書きの JA/EN が構造的に一致している�
 # 引用した他リポジトリの主張が言い換えられていないか。**姉妹側の incoming-probes は
 # Adoption Playbook 1 本にしか繋がっていないので、こちらの保護はこちら側にしか無い。**
 # チェックアウトが無ければスキップするが、スキップは合格ではない。
+# `OUTGOING_PROBE_FLAGS=--strict` にすると、スキップと作業ツリーへのフォールバックを失敗として
+# 扱う。**CI はこれを渡す。** ローカルではチェックアウトが無いこともあるが、CI で緑になった実行が
+# 実は何も検査していない形は、ゲートが無いのと変わらない。
+OUTGOING_PROBE_FLAGS ?=
+
 outgoing-probes: ## 姉妹リポジトリから引用した主張が生きているか（チェックアウトが無ければスキップ）
 	$(PYTHON) tools/check_outgoing_probes.py --selftest >/dev/null
-	$(PYTHON) tools/check_outgoing_probes.py
+	$(PYTHON) tools/check_outgoing_probes.py $(OUTGOING_PROBE_FLAGS)
 
 .PHONY: diagrams
 diagrams: ## 図を再生成し SVG / PNG を書き出す（AWS アイコンパッケージと draw.io が必要）

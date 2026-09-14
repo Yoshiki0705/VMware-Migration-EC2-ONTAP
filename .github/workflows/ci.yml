@@ -86,15 +86,24 @@ jobs:
 
       # 引用した主張が姉妹リポジトリで言い換えられていないか。**チェックアウトが無いと
       # 検査器はスキップするので、ここで隣に置く。** スキップは合格ではない。
+      # **引用先を 1 つ置き忘れると、その登録は検査されないまま緑になる。** だから CI では
+      # `--strict` を渡し、スキップと作業ツリーへのフォールバックを失敗として扱う。
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: Yoshiki0705/S3-Burst-on-ONTAP-Files
           path: siblings/S3-Burst-on-ONTAP-Files
           persist-credentials: false
 
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook
+          path: siblings/FSx-for-ONTAP-Adoption-Playbook
+          persist-credentials: false
+
       - name: Cited claims in sibling repositories
         env:
           SIBLING_ROOT: siblings
+          OUTGOING_PROBE_FLAGS: --strict
         run: make outgoing-probes
 
   shellcheck:
