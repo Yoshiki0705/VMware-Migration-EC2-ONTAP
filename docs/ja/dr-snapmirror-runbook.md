@@ -204,7 +204,18 @@ aws cloudformation delete-stack --stack-name <stack>
 #    aws fsx delete-storage-virtual-machine は MISCONFIGURED のままでも受け付け、DELETING に入ります
 aws fsx delete-storage-virtual-machine --storage-virtual-machine-id <svm-id>
 # 4) スタック削除を再試行する
+
+# 5) 救援ホストは、SVM が消えたことを確認してから消す
+#    削除を呼んだだけでは終わっていない。SvmNotFound が返るまでは、
+#    ONTAP を覗ける唯一のホストを残す
+aws fsx describe-storage-virtual-machines \
+  --storage-virtual-machine-ids <svm-id> \
+  --query 'StorageVirtualMachines[].Lifecycle' --output text
 ```
+
+**救援ホストの撤去は最後です。** 姉妹プロジェクトは、不要だと確認する前に救援スタックを消して
+**原因を切り分ける経路そのものを失っています**（実測の開示。ONTAP 9.18.1P6、`ap-northeast-1`）。
+段階 2 と同じ形が、復旧の側でもう一度現れます。
 
 ### 8.3 最終バックアップの残り方
 

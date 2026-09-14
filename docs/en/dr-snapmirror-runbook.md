@@ -203,7 +203,18 @@ Recovery order:
 #    delete-storage-virtual-machine is accepted even at MISCONFIGURED and moves to DELETING
 aws fsx delete-storage-virtual-machine --storage-virtual-machine-id <svm-id>
 # 4) Retry the stack deletion
+
+# 5) Delete the rescue host only after confirming the SVM is gone
+#    Calling delete is not the end of it. Keep the one host that can reach
+#    ONTAP until this returns SvmNotFound
+aws fsx describe-storage-virtual-machines \
+  --storage-virtual-machine-ids <svm-id> \
+  --query 'StorageVirtualMachines[].Lifecycle' --output text
 ```
+
+**The rescue host goes last.** The sibling project deleted its rescue stack before confirming it was no
+longer needed and **lost the only path for diagnosing what was holding the deletion** (their disclosure;
+ONTAP 9.18.1P6, `ap-northeast-1`). Stage 2 above reappears during the recovery itself.
 
 ### 8.3 Whether a final backup is left behind
 
