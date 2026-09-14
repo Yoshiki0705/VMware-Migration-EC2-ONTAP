@@ -152,3 +152,25 @@ def test_real_repository_passes() -> None:
     result = run_gate()
     skip_if_unjudgeable(result)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_private_is_skipped_by_default_and_reachable_on_request() -> None:
+    """`.private/` holds the blog drafts, which are a publication surface.
+
+    It is skipped by default because it is gitignored, so scanning it by default would make a local
+    run and CI disagree. But a repository name written by hand into a draft URL cannot be caught by
+    grepping for known names -- a sibling repository put local directory names into four URLs and all
+    four were 404. So the widening has to be reachable, not just documented.
+    """
+    assert ".private" in names.SKIP
+
+    default = names.prose_files()
+    widened = names.prose_files(names.SKIP - {".private"})
+    assert len(widened) >= len(default)
+
+    private_root = Path(names.ROOT) / ".private"
+    if not private_root.exists():
+        pytest.skip(".private/ is absent, which is the normal state for a fresh clone")
+    assert len(widened) > len(default), "the widened set did not pick up any draft"
+    assert any(".private" in p.as_posix() for p in widened)
+    assert not any(".private" in p.as_posix() for p in default)
