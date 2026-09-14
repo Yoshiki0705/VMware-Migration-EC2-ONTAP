@@ -246,3 +246,29 @@ Phase 2a で必ず踏む経路なので、先に手順へ入れた。
 このプロジェクトの `scripts/fio-benchmark.sh` は fio、先方は VDBENCH 5.04.07 直接。
 **同じ表に並べられない。** 撤去せず非互換を明記して残す方針（先方の推奨）。並べる必要が出たら
 VDBENCH 側に揃える。
+
+## 公開前に人が走らせる 2 つの手順
+
+**`.private/` は gitignore なので CI に存在しない。だから下書きに効く検査は置けない。**
+それでも**下書きは公開面**で、はてなに保存された時点で読者に届く。以下は手順であって
+ゲートではない。**手で走らせなければ何も起きない、という弱さを持ったまま置いている。**
+
+| 手順 | 何を見るか | 分かること |
+|---|---|---|
+| `make repo-names-private` | 下書きと内部ノートの GitHub リポジトリ名 | 旧名・**ローカルのディレクトリ名を書いた URL**（姉妹リポジトリはこれで 404 を 4 本作った） |
+| 下記の 4 パターンを下書きに当てる | 命名・禁止製品・ベンダー中立・PII | `agent-output-audit.yml` が tracked に強制しているものと同じ規則 |
+
+```bash
+# agent-output-audit.yml と同じパターン。**規則の定義は workflow 側が持つ**ので、
+# 変更したらこちらも合わせる（2 か所にあることが弱点であり、片方が古くなりうる）。
+for f in .private/blog-drafts/*/*.md; do
+  grep -nE '\bFSxN\b|FSx ONTAP|FSx S3 AP' "$f" | grep -v 'allow:naming'
+  grep -nE 'Workload Factory|NetApp Console|BlueXP' "$f" | grep -v 'allow:naming'
+  grep -nE '最強|game-changer|競合ツール|優位性|より優れ|is better than' "$f" | grep -v 'allow:naming'
+  grep -nE 'DB-I-[0-9]+|case[ #]?[0-9]{5,}|10\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.' "$f"
+done
+```
+
+**2026-09-14 の実行結果: 下書き 11 本すべてで 0 件。** リポジトリ名も 3 件すべて現行名で、
+`.private/` 配下の GitHub URL 55 本はすべて 200 だった。**この記録は実行した時点のもので、
+次の編集がこの状態を保つ保証にはならない。**
