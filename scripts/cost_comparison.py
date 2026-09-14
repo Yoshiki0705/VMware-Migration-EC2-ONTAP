@@ -371,7 +371,21 @@ EBS_RATES: dict[str, Rate] = {
     # HDD は IOPS もスループットも別課金が無い。**容量単価だけで、性能はサイズで決まる。**
     "st1_storage": Rate(0.054, "GB-Mo", "XFKFYKTCXSEG2DMU", "APN1-EBS:VolumeUsage.st1", "st1 容量"),
     "sc1_storage": Rate(0.018, "GB-Mo", "MPKBGKZFDXTW69NM", "APN1-EBS:VolumeUsage.sc1", "sc1 容量"),
+    # **Fast Snapshot Restore はスナップショット × AZ × 時間で課金される。**
+    # 有効にしないとスナップショットから作ったボリュームは遅延読み込みになり、
+    # 初期化が済むまで性能が落ちる。FlexClone と並べるときの EBS 側の対応手段。
+    # 出典: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-fast-snapshot-restore.html
+    "fast_snapshot_restore": Rate(
+        0.90,
+        "hours",
+        "53ACKV52Q4RVP4QW",
+        "APN1-EBS:FastSnapshotRestore",
+        "Fast Snapshot Restore（スナップショット × AZ × 時間）",
+    ),
 }
+
+# 月額換算に使う時間数。AWS の FSR の例も 30 日 = 720 時間で計算している。
+HOURS_PER_MONTH = 720
 
 GP3_BASELINE_IOPS = 3000
 GP3_BASELINE_THROUGHPUT_MBPS = 125
@@ -1272,7 +1286,9 @@ def compare_with_clones(
     複製ごとに全容量を確保する。**複製の本数が増えるほど差が開く方向に働く。**
 
     `clone_delta_ratio` は複製ごとに書き換わる割合で、**測るべき値である。**
-    開発用の複製をどれだけ書き換えるかはワークロード依存で、既定値には根拠がない。
+    参考値として、NetApp が公表している例（本番 100 GB に完全ミラー 1 本と 6 コピーで、
+    通常 800 GB のところ FlexClone なら 260 GB、削減率 67%）から逆算すると 1 本あたり 10% になる。
+    **これは NetApp の公表例で、このプロジェクトの実測値ではない。**
     """
     if clone_count < 0:
         raise ValueError("clone_count は 0 以上")
@@ -1301,6 +1317,156 @@ def compare_with_clones(
         "fsxn_monthly_usd": fsxn["total_monthly_usd"],
         "ebs_only_monthly_usd": round(ebs_total, 2),
         "fsxn_is_cheaper": fsxn["total_monthly_usd"] < ebs_total,
+    }
+
+
+def compare_golden_image_fanout(
+    golden_gb: float,
+    environment_count: int,
+    delta_ratio: float,
+    throughput_mbps: int,
+    deployment: str = "MULTI_AZ_1",
+    efficiency_ratio: float = EFFICIENCY_BY_WORKLOAD["vm"],
+    tiering_policy: str = "snapshot-only",
+    iops: int = 0,
+    ebs_volume_type: str = "gp3",
+    fsr_enabled_snapshots: int = 0,
+    fsr_azs: int = 1,
+) -> dict:
+    """1 つのゴールデンイメージから N 面を展開したときの比較。
+
+    **階層化しない前提でも成立する差である。** FlexClone は親とブロックを共有するので、
+    共有している分は容量を消費しない（[FSx の機能](https://aws.amazon.com/fsx/netapp-ontap/features/)）。
+    EBS はスナップショットから作った独立したボリュームになるため、**面の数だけ全容量が増える。**
+
+    **ブロックでも成立する。** AWS が明記しているのはボリューム単位のクローンだが、
+    [LUN はボリュームの中に置かれる](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/create-iscsi-lun.html)ので、
+    ボリュームをクローンすれば LUN も一緒にクローンされる。**`lun clone` 単体が
+    FSx for ONTAP で使えるかは確認していない。**
+
+    EBS 側で「すぐ使えて最初から全性能」を得るには Fast Snapshot Restore が必要で、
+    **スナップショット × AZ × 時間**で課金される。有効にしない場合は遅延読み込みになり、
+    初期化が済むまで性能が落ちる。
+
+    既定の `tiering_policy` は `snapshot-only`（CLI / API 既定、ブロックで想定される値）。
+    **階層化を前提にしなくても差が出ることを示すため。**
+
+    Args:
+        golden_gb: ゴールデンイメージの論理容量 (GB)
+        environment_count: 展開する面の数（ゴールデン自身は含まない）
+        delta_ratio: 1 面あたり書き換わる割合。**測るべき値**
+        throughput_mbps: FSx のスループット容量 (MB/s)
+        tiering_policy: 階層化ポリシー
+        ebs_volume_type: 比較する EBS のタイプ
+        fsr_enabled_snapshots: Fast Snapshot Restore を有効にするスナップショット数
+        fsr_azs: FSR を有効にする AZ 数
+    """
+    if environment_count < 0:
+        raise ValueError("environment_count は 0 以上")
+    if not 0 <= delta_ratio <= 1:
+        raise ValueError("delta_ratio は 0 <= x <= 1")
+
+    # FSx: ゴールデン + 各面の差分だけが論理容量に乗る
+    fsxn_logical = golden_gb * (1 + environment_count * delta_ratio)
+    fsxn = calculate_fsxn_cost(
+        fsxn_logical,
+        throughput_mbps,
+        deployment=deployment,
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=1.0,
+        iops=iops,
+        tiering_policy=tiering_policy,
+    )
+
+    # EBS: ゴールデン + 面の数だけ全容量
+    ebs_logical = golden_gb * (1 + environment_count)
+    ebs_one = calculate_ebs_cost(ebs_volume_type, golden_gb, iops=iops)
+    ebs_volumes = ebs_one["total_monthly_usd"] * (1 + environment_count)
+    fsr_hours = HOURS_PER_MONTH
+    fsr = fsr_enabled_snapshots * fsr_azs * fsr_hours * EBS_RATES["fast_snapshot_restore"].api_price
+    snapshot_storage = golden_gb * SNAPSHOT_RATES["standard"].api_price
+    ebs_total = ebs_volumes + fsr + snapshot_storage
+
+    return {
+        "golden_gb": golden_gb,
+        "environment_count": environment_count,
+        "delta_ratio": delta_ratio,
+        "tiering_policy": tiering_policy,
+        "fsxn_billed_logical_gb": round(fsxn_logical, 1),
+        "fsxn_monthly_usd": fsxn["total_monthly_usd"],
+        "ebs_billed_logical_gb": round(ebs_logical, 1),
+        "ebs_volumes_monthly_usd": round(ebs_volumes, 2),
+        "ebs_snapshot_monthly_usd": round(snapshot_storage, 2),
+        "ebs_fsr_monthly_usd": round(fsr, 2),
+        "ebs_total_monthly_usd": round(ebs_total, 2),
+        "capacity_ratio": round(ebs_logical / fsxn_logical, 2) if fsxn_logical else None,
+        "fsxn_is_cheaper": fsxn["total_monthly_usd"] < ebs_total,
+        "fsr_note": "**FSR を無効にすると遅延読み込みになり、初期化まで性能が落ちます。**"
+        if fsr_enabled_snapshots == 0
+        else f"FSR を {fsr_enabled_snapshots} スナップショット × {fsr_azs} AZ で有効にした場合",
+    }
+
+
+def compare_two_site_dr(
+    parent_gb: float,
+    primary_clone_count: int,
+    dr_clone_count: int,
+    delta_ratio: float,
+    throughput_mbps: int,
+    primary_deployment: str = "MULTI_AZ_1",
+    secondary_deployment: str = "SINGLE_AZ_1",
+    efficiency_ratio: float = EFFICIENCY_BY_WORKLOAD["vm"],
+    tiering_policy: str = "snapshot-only",
+    iops: int = 0,
+) -> dict:
+    """Prod + Dev/QA クローンの一次側と、SnapMirror 先 + DR クローンの二次側を合わせた月額。
+
+    **クローンは親と同じアグリゲートに載る。** ONTAP はボリューム移動時にクローン関係を分割し、
+    それが「新しいディスク上で容量が二重になる」ため SSD 減設が止まる、という AWS の記述から、
+    クローンが親と同じディスクを共有していることが読める
+    （[出典](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/ssd-decrease-troubleshooting.html)）。
+    したがって **Dev / QA のクローンは一次側の確保済み SSD・IOPS・スループット容量を分け合う。**
+
+    **DR 側は別のファイルシステムなので、最小 SSD 1,024 GiB とスループット容量が独立に乗る。**
+    ここが「クローンは安い」で済ませられない部分である。DR 側でクローンを作れば、
+    SnapMirror を止めずに検証できる。
+
+    Returns:
+        一次側・二次側それぞれの内訳と合計。
+    """
+    primary = calculate_fsxn_cost(
+        parent_gb * (1 + primary_clone_count * delta_ratio),
+        throughput_mbps,
+        deployment=primary_deployment,
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=1.0,
+        iops=iops,
+        tiering_policy=tiering_policy,
+    )
+    secondary = calculate_fsxn_cost(
+        parent_gb * (1 + dr_clone_count * delta_ratio),
+        throughput_mbps,
+        deployment=secondary_deployment,
+        efficiency_ratio=efficiency_ratio,
+        hot_ratio=1.0,
+        iops=iops,
+        tiering_policy=tiering_policy,
+    )
+    return {
+        "parent_gb": parent_gb,
+        "primary_clone_count": primary_clone_count,
+        "dr_clone_count": dr_clone_count,
+        "primary_deployment": primary_deployment,
+        "secondary_deployment": secondary_deployment,
+        "primary_monthly_usd": primary["total_monthly_usd"],
+        "secondary_monthly_usd": secondary["total_monthly_usd"],
+        "total_monthly_usd": round(
+            primary["total_monthly_usd"] + secondary["total_monthly_usd"], 2
+        ),
+        "primary_at_floor": primary["at_minimum_floor"],
+        "secondary_at_floor": secondary["at_minimum_floor"],
+        "note": "**二次側は別のファイルシステムなので、最小 SSD とスループット容量が独立に乗ります。**"
+        "クローンの容量が小さくても、この 2 つは減りません",
     }
 
 
@@ -1651,6 +1817,56 @@ def generate_comparison_report(
     for spec in VOLUME_SPECS.values():
         a(f"| {spec.label} | {spec.note} |")
     a("")
+    a("## ゴールデンイメージから N 面を作る場合")
+    a("")
+    a("**この差は階層化に依存しないので、ブロックでも成立します。** FlexClone は親と")
+    a("ブロックを共有するため、面を増やしても共有部分の容量は増えません。EBS は")
+    a("スナップショットから作った独立したボリュームになるので、**面の数だけ全容量が増えます。**")
+    a("")
+    a("| 面の数 | 課金対象（FSx / EBS） | 倍率 | FSx 月額 | EBS 月額 |")
+    a("|---|---|---|---|---|")
+    for count in (0, 10, 30, 50):
+        g = compare_golden_image_fanout(
+            data_size_gb,
+            count,
+            0.10,
+            throughput_mbps,
+            deployment=deployment,
+            efficiency_ratio=efficiency_ratio,
+            iops=iops,
+        )
+        mark = "**" if g["fsxn_is_cheaper"] else ""
+        a(
+            f"| {count} | {g['fsxn_billed_logical_gb']:,.0f} / "
+            f"{g['ebs_billed_logical_gb']:,.0f} GB | {g['capacity_ratio']:.2f} 倍 "
+            f"| {mark}${g['fsxn_monthly_usd']:,.2f}{mark} | ${g['ebs_total_monthly_usd']:,.2f} |"
+        )
+    a("")
+    a("差分は 1 面あたり 10%（NetApp の公表例から逆算）。**測るべき値です。**")
+    a("")
+    fsr = compare_golden_image_fanout(
+        data_size_gb,
+        10,
+        0.10,
+        throughput_mbps,
+        deployment=deployment,
+        efficiency_ratio=efficiency_ratio,
+        iops=iops,
+        fsr_enabled_snapshots=1,
+        fsr_azs=1,
+    )
+    a(
+        f"**EBS 側で「すぐ使えて最初から全性能」を得るには Fast Snapshot Restore が必要です。**"
+        f" 10 面で 1 スナップショット × 1 AZ を有効にすると、ボリューム "
+        f"${fsr['ebs_volumes_monthly_usd']:,.2f} + スナップショット "
+        f"${fsr['ebs_snapshot_monthly_usd']:,.2f} + FSR ${fsr['ebs_fsr_monthly_usd']:,.2f} = "
+        f"**${fsr['ebs_total_monthly_usd']:,.2f}** になり、FSx の "
+        f"${fsr['fsxn_monthly_usd']:,.2f} を上回ります。"
+    )
+    a("**有効にしない場合は遅延読み込みで、初期化が済むまで性能が落ちます。**")
+    a("")
+    a("機能ごとの選定要素は `docs/ja/ontap-capability-selection-factors.md` にあります。")
+    a("")
     a("## ブロックストレージで階層化を前提にしないこと")
     a("")
     a("**この計算の逆転は階層化が効くことに依存しています。** ブロック（iSCSI / NVMe の LUN）では")
@@ -1899,7 +2115,8 @@ def main() -> int:
         "--clone-delta-ratio",
         type=float,
         default=0.10,
-        help="複製ごとに書き換わる割合。**測るべき値**",
+        help="複製ごとに書き換わる割合。**測るべき値。** 既定 0.10 は NetApp の公表例"
+        "（本番 100 GB + ミラー + 6 コピーで 260 GB）から逆算した値",
     )
     p.add_argument("--output", type=str, default=None, help="出力ファイルパス (.md)")
     p.add_argument("--json", action="store_true", help="JSON でも出力")

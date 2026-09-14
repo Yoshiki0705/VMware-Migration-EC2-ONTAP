@@ -14,6 +14,7 @@
 |:-----|:------|:-----|
 | Compare migration approaches | [Migration Method Comparison](docs/en/migration-method-comparison.md) | 10 min |
 | Compare storage cost | [Cost comparison](docs/en/tco-comparison.md) | 10 min |
+| Weigh ONTAP capabilities | [Capabilities as selection factors](docs/en/ontap-capability-selection-factors.md) | 10 min |
 | Migrate with Shift Toolkit | [Shift Toolkit Procedure](docs/en/shift-toolkit-ec2-procedure.md) | 30 min |
 | Migrate with AWS Transform | [AWS Transform Procedure](docs/en/aws-transform-migration-procedure.md) | 30 min |
 | Migrate with VM Import/Export | [VM Import Procedure](docs/en/vm-import-procedure.md) | 20 min |

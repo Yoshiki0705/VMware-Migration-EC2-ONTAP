@@ -426,6 +426,7 @@ python3 scripts/cost_comparison.py --check-prices
 
 | Document | Contents |
 |---|---|
+| [Capabilities as selection factors](ontap-capability-selection-factors.md) | **What capacity price cannot express: FlexClone, SnapMirror, SnapLock** |
 | [Migration method comparison](migration-method-comparison.md) | Which tool to migrate with |
 | [Quickstart](quickstart.md) | Building and tearing down the environment |
 | [iSCSI setup](fsxn-iscsi-setup.md) | Creating and mounting the LUN |

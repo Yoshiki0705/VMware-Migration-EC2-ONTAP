@@ -22,6 +22,7 @@ from cost_comparison import (  # noqa: E402
     EFFICIENCY_BY_WORKLOAD,
     FSXN_RATES,
     GP3_BASELINE_IOPS,
+    HOURS_PER_MONTH,
     IO2_TIER1_LIMIT,
     IO2_TIER2_LIMIT,
     MIN_SSD_GIB,
@@ -40,6 +41,8 @@ from cost_comparison import (  # noqa: E402
     calculate_fsxn_cost,
     compare_all_volume_types,
     compare_at_scale,
+    compare_golden_image_fanout,
+    compare_two_site_dr,
     compare_with_clones,
     ebs_multi_az_cost,
     find_capacity_crossover,
@@ -734,3 +737,116 @@ def test_report_warns_against_assuming_tiering_for_block():
     assert "snapshot-only" in report
     assert "space-allocation" in report
     assert "実測値ではありません" in report
+
+
+# ---------------------------------------------------------------- ゴールデンイメージの展開
+
+# **階層化に依存しない差である。** FlexClone は親とブロックを共有するので、面を増やしても
+# 共有部分は増えない。EBS は面の数だけ全容量が増える。ブロックでも成立する。
+
+
+def test_clone_fanout_bills_only_the_delta():
+    r = compare_golden_image_fanout(500, 10, 0.10, 512)
+    assert r["fsxn_billed_logical_gb"] == pytest.approx(500 * (1 + 10 * 0.10))
+    assert r["ebs_billed_logical_gb"] == pytest.approx(500 * 11)
+    assert r["capacity_ratio"] > 5
+
+
+def test_clone_fanout_holds_without_tiering():
+    """**既定は snapshot-only。** 階層化を前提にしなくても差が出ることを固定する。"""
+    r = compare_golden_image_fanout(500, 30, 0.10, 512)
+    assert r["tiering_policy"] == "snapshot-only"
+    assert r["fsxn_is_cheaper"] is True
+
+
+def test_few_environments_favour_ebs():
+    """**面が少ないうちは EBS が安い。** 両側を固定する。"""
+    assert compare_golden_image_fanout(500, 0, 0.10, 512)["fsxn_is_cheaper"] is False
+    assert compare_golden_image_fanout(500, 10, 0.10, 512)["fsxn_is_cheaper"] is False
+
+
+def test_fast_snapshot_restore_moves_the_crossover_earlier():
+    """**EBS 側で「すぐ全性能」を得ると逆転が早まる。** FSR はスナップショット × AZ × 時間。"""
+    without = compare_golden_image_fanout(500, 10, 0.10, 512)
+    with_fsr = compare_golden_image_fanout(500, 10, 0.10, 512, fsr_enabled_snapshots=1, fsr_azs=1)
+    assert without["fsxn_is_cheaper"] is False
+    assert with_fsr["fsxn_is_cheaper"] is True
+    # 1 スナップショット × 1 AZ × 720 時間 × $0.90
+    assert with_fsr["ebs_fsr_monthly_usd"] == pytest.approx(1 * 1 * HOURS_PER_MONTH * 0.90)
+    assert with_fsr["ebs_fsr_monthly_usd"] == pytest.approx(648.0)
+
+
+def test_fsr_scales_with_snapshots_and_azs():
+    """AWS の例と同じ形。**スナップショット数 × AZ 数で増える。**"""
+    one = compare_golden_image_fanout(500, 1, 0.1, 512, fsr_enabled_snapshots=1, fsr_azs=1)
+    six = compare_golden_image_fanout(500, 1, 0.1, 512, fsr_enabled_snapshots=2, fsr_azs=3)
+    assert six["ebs_fsr_monthly_usd"] == pytest.approx(one["ebs_fsr_monthly_usd"] * 6)
+
+
+def test_netapp_published_example_implies_a_ten_percent_delta():
+    """**既定の 10% は NetApp の公表例から逆算した値。**
+
+    本番 100 GB + 完全ミラー 1 本 + 6 コピーで、通常 800 GB のところ FlexClone なら 260 GB。
+    差の 60 GB を 6 コピーで割ると 1 本 10 GB = 10%。**公表例で、こちらの実測ではない。**
+    """
+    full = 100 + 100 + 6 * 100
+    assert full == 800
+    implied_delta = (260 - 100 - 100) / 6 / 100
+    assert implied_delta == pytest.approx(0.10)
+    assert round((1 - 260 / full) * 100) == 68  # NetApp の表記は 67%（切り捨て）
+
+
+def test_fanout_inputs_are_validated():
+    with pytest.raises(ValueError, match="environment_count"):
+        compare_golden_image_fanout(500, -1, 0.1, 512)
+    with pytest.raises(ValueError, match="delta_ratio"):
+        compare_golden_image_fanout(500, 1, 1.5, 512)
+
+
+def test_report_covers_the_golden_image_case():
+    report = generate_comparison_report(500, 512, 0.30, 0, tiering_policy="snapshot-only")
+    assert "## ゴールデンイメージから N 面を作る場合" in report
+    assert "Fast Snapshot Restore" in report
+    assert "測るべき値です" in report
+
+
+# ---------------------------------------------------------------- 2 サイト構成（DR）
+
+# **クローンは親と同じアグリゲートに載り、二次側は別のファイルシステムになる。**
+# 「クローンは容量を消費しないから DR は安い」が成立しない理由がここにある。
+
+
+def test_secondary_site_pays_its_own_floors():
+    """**二次側は別ファイルシステムなので最小 SSD とスループット容量が独立に乗る。**"""
+    r = compare_two_site_dr(2048, 2, 1, 0.10, 512)
+    assert r["secondary_monthly_usd"] > 0
+    assert r["secondary_at_floor"] is True
+    # DR クローンを 0 本にしても二次側は安くならない（床が支配する）
+    no_clone = compare_two_site_dr(2048, 2, 0, 0.10, 512)
+    assert no_clone["secondary_monthly_usd"] == pytest.approx(r["secondary_monthly_usd"])
+
+
+def test_secondary_cost_is_dominated_by_throughput_not_capacity():
+    """二次側の内訳はスループット容量が大半を占める。**容量の話に還元できない。**"""
+    s = calculate_fsxn_cost(
+        2048 * 1.1,
+        512,
+        deployment="SINGLE_AZ_1",
+        hot_ratio=1.0,
+        tiering_policy="snapshot-only",
+    )
+    assert s["cost_throughput"] > s["cost_ssd"]
+    assert s["cost_throughput"] / s["total_monthly_usd"] > 0.7
+
+
+def test_multi_az_secondary_costs_more_than_single_az():
+    single = compare_two_site_dr(2048, 2, 1, 0.10, 512, secondary_deployment="SINGLE_AZ_1")
+    multi = compare_two_site_dr(2048, 2, 1, 0.10, 512, secondary_deployment="MULTI_AZ_1")
+    assert multi["total_monthly_usd"] > single["total_monthly_usd"]
+
+
+def test_two_site_total_is_the_sum_of_both_sides():
+    r = compare_two_site_dr(2048, 2, 1, 0.10, 512)
+    assert r["total_monthly_usd"] == pytest.approx(
+        r["primary_monthly_usd"] + r["secondary_monthly_usd"], abs=0.01
+    )
