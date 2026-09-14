@@ -42,7 +42,7 @@ Confirming the physical constraint that EC2 can only boot from an AMI (EBS-backe
 **Primary source**: "Migrate VMs from VMware to AWS EC2 and FSx for ONTAP" — Shift Toolkit UI documentation
 
 - **Q1**: ✅ **Includes OS disk AMI conversion.** Two methods provided:
-  1. **Amazon EBS Direct APIs** (recommended, fastest): Creates EBS snapshot directly
+  1. **Amazon EBS Direct APIs** (the method the procedure recommends, described there as taking less time than the S3 route): Creates EBS snapshot directly
   2. **AWS VM Import/Export**: VMDK → RAW → S3 upload → AMI conversion
   - In the current Preview release, only S3 import/export is enabled. EBS Direct APIs will be enabled in the next drop.
   - **As of 2026-09-14, whether it has been enabled is unverified.** NetApp's public documentation

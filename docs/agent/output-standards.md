@@ -23,8 +23,20 @@ when steering is not loaded. Enforced by
 
 Present alternatives as options suited to different contexts. Superiority
 claims ("best", "beats X", "より優れている", "競合ツール", "優位性", <!-- allow:naming -->
-"game-changer") are forbidden. State trade-offs symmetrically, including the <!-- allow:naming -->
-constraints of the option being recommended.
+"game-changer", "最強", "最速", "最も高速", "fastest") are forbidden. State <!-- allow:naming -->
+trade-offs symmetrically, including the constraints of the option being
+recommended.
+
+**A superlative about speed is a superiority claim.** The speed words were added
+on 2026-09-14, after a blog draft carried "最も高速なツールです" to within a day of <!-- allow:naming -->
+publication: `最強` was on the list and the speed superlative was not, so a claim <!-- allow:naming -->
+about performance was the one shape that passed. Adding them turned up four
+tracked lines calling one method 推奨・最速, all of them the vendor procedure's <!-- allow:naming -->
+own wording, which now says so instead of stating it as ours.
+
+**Attribute, do not delete, when the vendor said it.** "The procedure recommends
+this method and describes it as taking less time" keeps the fact and drops the
+claim. What the checker rejects is this repository asserting it.
 
 ## Public-output safety
 
