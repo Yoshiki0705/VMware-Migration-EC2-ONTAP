@@ -136,7 +136,13 @@ jobs:
             [ ! -f "$file" ] && continue
             # Same allow:naming escape: the document that forbids these phrases
             # has to quote them.
-            HITS=$(grep -nE '最強|game-changer|ゲームチェンジャー|競合ツール|優位性|より優れ|is better than|is superior to' "$file" | grep -v 'allow:naming' || true)
+            #
+            # 最速 / 最も高速 / fastest を 2026-09-14 に追加した。**ブログ第 1 回の下書きが
+            # 「最も高速なツールです」で公開直前まで通っていた** — 最強 は入っていたが速度の
+            # 最上級が抜けていて、性能の優位性だけが検査をすり抜ける形になっていた。
+            # 追加時に tracked 側で 4 箇所（EBS Direct APIs を「推奨・最速」と書いていた行）が
+            # 当たり、いずれもベンダー手順書の案内なので**出典を明示する形に書き換えた。**
+            HITS=$(grep -nE '最強|最も高速|最速|最も速い|game-changer|ゲームチェンジャー|競合ツール|優位性|より優れ|is better than|is superior to|fastest' "$file" | grep -v 'allow:naming' || true)
             if [ -n "$HITS" ]; then
               echo "::error file=$file::Vendor neutrality violation found"
               echo "$HITS" | while IFS= read -r line; do

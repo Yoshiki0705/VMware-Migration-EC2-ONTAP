@@ -219,7 +219,7 @@ NetApp 公式ドキュメントの「Migrate VMs to Amazon EC2」セクション
 **Early Preview の確定範囲（公式手順書に基づく）:**
 
 - OS ディスク → **EBS 形式に変換**（2つの方式を提供）
-  - **Amazon EBS Direct APIs**（推奨・最速）: EBS snapshot を直接作成。リージョン/AZ/アカウント横断対応
+  - **Amazon EBS Direct APIs**（手順書が推奨する方式。S3 経由より所要時間が短いと案内されている）: EBS snapshot を直接作成。リージョン/AZ/アカウント横断対応
   - **AWS VM Import/Export**: VMDK → RAW → S3 アップロード → AMI 変換
   - **現在の Preview**: S3 import/export のみ有効。EBS Direct APIs は次回ドロップで有効化
 - データディスク → FSx for ONTAP 上の **iSCSI LUN** に VMDK → LUN 変換
@@ -279,7 +279,7 @@ EC2 インスタンスは Amazon Machine Image (AMI) からブートする必要
 | 方式 | 概要 | ステータス | 用途 |
 |------|------|-----------|------|
 | AWS VM Import/Export | VMDK → RAW → S3 → `import-image` → AMI | ✅ 現 Preview で有効 | 標準変換パス |
-| Amazon EBS Direct APIs | EBS snapshot 直接作成（推奨・最速）、リージョン/AZ/アカウント横断 | 🔜 次回ドロップで有効化 | 高速・大容量向け |
+| Amazon EBS Direct APIs | EBS snapshot 直接作成（手順書が推奨）、リージョン/AZ/アカウント横断 | 🔜 次回ドロップで有効化 | 大容量向け（**所要時間は未測定**） |
 
 **ゲスト OS 準備（自動化確定）:**
 

@@ -42,7 +42,7 @@ EC2 は AMI（EBS バックド）からのみブート可能で、FSx for ONTAP 
 **一次情報**: "Migrate VMs from VMware to AWS EC2 and FSx for ONTAP" — Shift Toolkit UI ドキュメント
 
 - **Q1**: ✅ **OS ディスクの AMI 変換まで含む。** 2つの方式を提供:
-  1. **Amazon EBS Direct APIs**（推奨・最速）: EBS snapshot を直接作成
+  1. **Amazon EBS Direct APIs**（手順書が推奨する方式。S3 経由より所要時間が短いと案内されている）: EBS snapshot を直接作成
   2. **AWS VM Import/Export**: VMDK → RAW → S3 アップロード → AMI 変換
   - 現在の Preview リリースでは S3 import/export のみ有効。EBS Direct APIs は次回ドロップで有効化予定。
   - **2026-09-14 時点で、有効化されたかは未確認。** NetApp の公開ドキュメント（Shift Toolkit の
