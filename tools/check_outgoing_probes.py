@@ -30,13 +30,27 @@ Needs a local checkout of each cited repository next to this one, and skips with
 there is none -- the way the other checkouts-required targets do. **A skip is not a pass**, and the
 exit line says which it was.
 
+**Reads `origin/main`, not the checkout's working tree.** The working tree is somebody's editing
+state: a probe can be satisfied by a sentence that exists only there and not in the repository
+anybody else can read, and that direction passes silently. Verifying by hand once is not the same
+as the gate doing it, so the gate does it. `git show` reads local objects, so this stays offline.
+
+When a checkout cannot answer for `origin/main` the read falls back to the working tree, and the
+output says so for that repository -- **a fallen-back run is weaker evidence than one that was not,
+and the output is the only place that difference is visible.** "This checkout has no `origin/main`"
+and "that path is absent at `origin/main`" are asked separately, by `rev-parse --verify` and then
+`show`, because the two need opposite handling and telling them apart from git's stderr wording
+would rest the distinction on a string that changes between versions.
+
 Run:  python3 tools/check_outgoing_probes.py
       python3 tools/check_outgoing_probes.py --selftest
+      python3 tools/check_outgoing_probes.py --contract PATH
 """
 
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -115,6 +129,51 @@ def locate(repo: str) -> Path | None:
     return None
 
 
+PUBLISHED_REF = "origin/main"
+
+
+def git(checkout: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=checkout,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        # No git on PATH. Reported as an inability to reach the ref, not as a missing file.
+        return subprocess.CompletedProcess(args, returncode=127, stdout="", stderr="git not found")
+
+
+def answers_for_published_ref(checkout: Path) -> bool:
+    """Whether this checkout can be asked about `origin/main` at all.
+
+    Separate from whether a given path exists there. The two need opposite handling -- fall back
+    versus report the file gone -- so the question is asked with `rev-parse --verify` rather than
+    read out of the wording of a later failure.
+    """
+    return git(checkout, "rev-parse", "--verify", "--quiet", PUBLISHED_REF).returncode == 0
+
+
+class Read(NamedTuple):
+    body: str | None
+    from_published_ref: bool
+
+
+def read(checkout: Path, path: str, published: bool) -> Read:
+    """Body of `path`, from `origin/main` when the checkout can answer for it."""
+    if published:
+        shown = git(checkout, "show", f"{PUBLISHED_REF}:{path}")
+        # A non-zero return here means the path is absent at the ref, which `published` has
+        # already ruled out being about the ref itself.
+        return Read(shown.stdout if shown.returncode == 0 else None, True)
+    target = checkout / path
+    if not target.exists():
+        return Read(None, False)
+    return Read(target.read_text(encoding="utf-8", errors="replace"), False)
+
+
 def selftest() -> int:
     cases = [
         ("a\tb\tretraction\tclaim", 1, 0),
@@ -151,15 +210,23 @@ def selftest() -> int:
     return 1 if failures else 0
 
 
+def contract_path() -> Path:
+    """The contract to read. `--contract` exists so the tests can drive real registrations."""
+    if "--contract" in sys.argv:
+        return Path(sys.argv[sys.argv.index("--contract") + 1])
+    return CONTRACT
+
+
 def main() -> int:
     if "--selftest" in sys.argv:
         return selftest()
 
-    if not CONTRACT.exists():
-        print(f"outgoing-probes: no contract at {CONTRACT.relative_to(ROOT)}; nothing cited")
+    contract = contract_path()
+    if not contract.exists():
+        print(f"outgoing-probes: no contract at {contract}; nothing cited")
         return 0
 
-    probes, problems = parse(CONTRACT.read_text(encoding="utf-8"))
+    probes, problems = parse(contract.read_text(encoding="utf-8"))
     if problems:
         for problem in problems:
             print(f"outgoing-probes: {problem}")
@@ -171,18 +238,26 @@ def main() -> int:
     failures: list[str] = []
     warnings: list[str] = []
     skipped: set[str] = set()
+    fell_back: set[str] = set()
     checked = 0
+    published: dict[str, bool] = {}
 
     for probe in probes:
         checkout = locate(probe.repo)
         if checkout is None:
             skipped.add(probe.repo)
             continue
-        target = checkout / probe.path
-        if not target.exists():
-            failures.append(f"{probe.repo}: {probe.path} does not exist (line {probe.line})")
+        if probe.repo not in published:
+            published[probe.repo] = answers_for_published_ref(checkout)
+            if not published[probe.repo]:
+                fell_back.add(probe.repo)
+        body, from_published_ref = read(checkout, probe.path, published[probe.repo])
+        if body is None:
+            where = PUBLISHED_REF if from_published_ref else "the working tree"
+            failures.append(
+                f"{probe.repo}: {probe.path} does not exist at {where} (line {probe.line})"
+            )
             continue
-        body = target.read_text(encoding="utf-8", errors="replace")
         checked += 1
         if probe.probe in body:
             continue
@@ -202,6 +277,17 @@ def main() -> int:
             + ", ".join(sorted(skipped))
             + " (no checkout beside this repository). **A skip is not a pass.**"
         )
+    if fell_back:
+        print(
+            "outgoing-probes: fell back to the working tree for "
+            + ", ".join(sorted(fell_back))
+            + f" (that checkout cannot answer for {PUBLISHED_REF}). "
+            "**A working-tree read is weaker evidence: it can be satisfied by an "
+            "unpushed edit.**"
+        )
+    read_at_ref = sorted(repo for repo, ok in published.items() if ok)
+    if read_at_ref:
+        print(f"outgoing-probes: read {', '.join(read_at_ref)} at {PUBLISHED_REF}")
     if failures:
         return 1
     counts = {role: sum(1 for p in probes if p.role == role) for role in ROLES}
