@@ -39,10 +39,11 @@
 #
 # Line breaks matter: a probe spanning one never matches. `上限は 1 フローの容量ではない` was
 # rejected as a candidate for exactly that reason and the two strings around it registered instead.
-# **They later recommended that same string as a replacement, describing it as occurring once on one
-# line. Checked at 1bedd45 and again at a97a4ec: zero occurrences both times.** It is still split across
-# lines 957-958 of their results file (`**上限は 1 フローの` / `容量ではない。**`), and `git grep` over their docs tree
-# finds it nowhere. Their other suggestion, the already-registered division string, is what stands.
+# **They recommended that same string twice, describing it as occurring once on one line. It was zero
+# occurrences at both 1bedd45 and a97a4ec**, split across lines 957-958 (`**上限は 1 フローの` /
+# `容量ではない。**`). **They joined it at 2fc5f08, so it is now registered**: line 958, one occurrence,
+# one line. It sits beside `1 → 2 では逐次スループットが 1 バイトも動かない`, and both are kept because
+# one is the observation and the other its reading, and cross-repo-block-performance.md restates both.
 #
 # ---------------------------------------------------------------------------------------------------
 # FSx-for-ONTAP-Adoption-Playbook
@@ -65,7 +66,7 @@
 # ---------------------------------------------------------------------------------------------------
 # S3-Burst-on-ONTAP-Files
 #
-# Read at a97a4ec (bumped from 1bedd45; the diff touching cited files is 2 files / 7 lines and the
+# Read at 2fc5f08 (a97a4ec before it; the doc-level pins stay at a97a4ec, where the quoted values and the
 # anchors still resolve). **F-1, F-2 and F-3 are all measured** and their environments are torn down. The
 # earlier note here, that F-2 and F-3 were not run, was true at f27363c and is kept only as the
 # reason the probe set was extended rather than written at once.
@@ -156,4 +157,5 @@ S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	�
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	どれが当たっているかを検証していないので、原因を書かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	セッション数を帯域の割り算で決める形そのものが成立していない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	ファイルシステムを載せた場合の値ではない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	上限は 1 フローの容量ではない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	幅は 2.64 倍である
