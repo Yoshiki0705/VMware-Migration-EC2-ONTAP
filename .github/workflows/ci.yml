@@ -100,14 +100,10 @@ jobs:
           path: siblings/FSx-for-ONTAP-Adoption-Playbook
           persist-credentials: false
 
-      - name: Cited claims in sibling repositories
-        env:
-          SIBLING_ROOT: siblings
-          OUTGOING_PROBE_FLAGS: --strict
-        run: make outgoing-probes
-
-      # 逆方向。**こちらの編集で、姉妹が引いた文が消えていないか。** 失敗の原因は
-      # 目の前の diff なので、こちらのほうが merge の判断に直接効く。
+      # **こちらの編集で、姉妹が引いた文が消えていないか。** 失敗の原因が目の前の diff なので
+      # この方向だけを merge の判断に入れる。逆方向（こちらが引いた主張が言い換えられていないか）は
+      # 週 1 回の cited-claims.yml に置いた — 登録の 6 割が 1 ファイルに集まっており、相手が
+      # そのファイルを書き換えると無関係な変更がまとめて止まるため。
       - name: Claims cited from this repository
         env:
           SIBLING_ROOT: siblings

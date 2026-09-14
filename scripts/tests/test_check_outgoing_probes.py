@@ -11,6 +11,7 @@ Each test is written so that reverting the fix makes it fail for the stated reas
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -235,3 +236,30 @@ def test_weakness_is_reported_for_a_reread_probe_too(tmp_path: Path) -> None:
     result = run(tmp_path, make_contract(tmp_path, role="reread"))
     assert result.returncode == 0, result.stdout
     assert "occurs 3 times" in result.stdout
+
+
+def test_the_shape_is_recomputed_from_the_registrations(tmp_path: Path) -> None:
+    """The premise behind blocking is printed, not stored."""
+    body = f"**{CLAIM}。**\n"
+    make_checkout(tmp_path, committed=body, worktree=body)
+    contract = tmp_path / "contract.txt"
+    rows = sorted([CLAIM, CLAIM[:12]])
+    contract.write_text(
+        "".join(f"{REPO}\t{CITED}\tretraction\t{row}\n" for row in rows), encoding="utf-8"
+    )
+    result = run(tmp_path, contract)
+    assert result.returncode == 0, result.stdout
+    assert "shape: 2 registration(s) across 1 file(s), 2 in the largest" in result.stdout
+
+
+def test_the_blocking_rationale_carries_no_hand_written_count() -> None:
+    """The premise went stale once already.
+
+    The document explains why this check blocks. Writing the number there means the explanation
+    outlives the shape it rests on, so the number has to come from the checker.
+    """
+    note = (ROOT / "docs" / "agent" / "cross-repo-block-performance.md").read_text(encoding="utf-8")
+    section = note.split("## 2 方向のゲートと、ブロックの扱い", 1)
+    assert len(section) == 2, "the section explaining the blocking decision is gone"
+    stale = re.findall(r"引用が \d+ 件|登録が \d+ 件|\d+ 件の登録", section[1])
+    assert not stale, f"hand-written registration counts in the rationale: {stale}"

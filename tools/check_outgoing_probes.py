@@ -174,6 +174,25 @@ def read(checkout: Path, path: str, published: bool) -> Read:
     return Read(target.read_text(encoding="utf-8", errors="replace"), False)
 
 
+def describe_shape(probes: list[Probe]) -> str:
+    """How the registrations are spread, recomputed on every run.
+
+    **The decision to block on this check rests on this shape**, not on the count: rows spread thin
+    across many files mean a sibling's rewrite reddens one or two of them, while rows concentrated in
+    one file mean an unrelated change arrives with everything red at once, which is the state that
+    trains people to ignore red. Printed rather than written into a document, because a premise
+    recorded by hand goes stale and then keeps justifying a decision it no longer supports.
+    """
+    per_file: dict[tuple[str, str], int] = {}
+    for probe in probes:
+        per_file[(probe.repo, probe.path)] = per_file.get((probe.repo, probe.path), 0) + 1
+    largest = max(per_file.values(), default=0)
+    return (
+        f"shape: {len(probes)} registration(s) across {len(per_file)} file(s), "
+        f"{largest} in the largest"
+    )
+
+
 def selftest() -> int:
     cases = [
         ("a\tb\tretraction\tclaim", 1, 0),
@@ -314,6 +333,7 @@ def main() -> int:
     read_at_ref = sorted(repo for repo, ok in published.items() if ok)
     if read_at_ref:
         print(f"outgoing-probes: read {', '.join(read_at_ref)} at {PUBLISHED_REF}")
+    print(f"outgoing-probes: {describe_shape(probes)}")
     if failures:
         return 1
     counts = {role: sum(1 for p in probes if p.role == role) for role in ROLES}

@@ -176,7 +176,7 @@ drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow out
 # 以前は Makefile のコメントが「diagram-fonts / diagram-flow は CI で常時走らせる」と
 # 書いているのに ci.yml が drift を呼んでおらず、3 つの図の検査が一度も CI で走って
 # いなかった。集合を 2 か所に書くと、片方だけが更新される。
-gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow outgoing-probes incoming-probes ## どこでも走る検査（CI とフックが呼ぶ）
+gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow incoming-probes ## どこでも走る検査（CI とフックが呼ぶ）
 
 .PHONY: ci
 ci: gates agent-config ## CI が呼ぶ集約ターゲット（gates + ~/.kiro 依存の到達性検査）

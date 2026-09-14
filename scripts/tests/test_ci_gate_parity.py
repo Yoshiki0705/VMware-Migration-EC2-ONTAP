@@ -98,3 +98,29 @@ def test_parser_ignores_setup_and_separate_jobs() -> None:
 def test_parser_stops_at_the_makefile_comment() -> None:
     """`## help text` must not be read as a prerequisite."""
     assert gates_prerequisites("gates: lint test ## どこでも走る検査\n") == ["lint", "test"]
+
+
+# ------------------------------------------------- the direction that left `gates`
+CITED_CLAIMS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "cited-claims.yml"
+
+
+def test_the_outgoing_direction_still_runs_somewhere() -> None:
+    """`outgoing-probes` left `gates` on purpose, so something else has to run it.
+
+    It was moved out because most registrations sit in one sibling file, so one rewrite there
+    reddens an unrelated pull request with everything at once. **Dropping it entirely was not the
+    decision**, and a target that no workflow invokes is indistinguishable from a deleted one.
+    """
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+    assert "\noutgoing-probes:" in makefile, "the target itself is gone"
+    assert "outgoing-probes" not in " ".join(gates_prerequisites(makefile)), (
+        "outgoing-probes is back in `gates`; if that is intended, the shape it was moved out for "
+        "should be re-read first"
+    )
+    assert CITED_CLAIMS_WORKFLOW.exists(), "no workflow runs the outgoing direction any more"
+    workflow = CITED_CLAIMS_WORKFLOW.read_text(encoding="utf-8")
+    assert "run: make outgoing-probes" in workflow
+    assert "schedule:" in workflow, "the periodic trigger is what replaced blocking"
+    assert "OUTGOING_PROBE_FLAGS: --strict" in workflow, (
+        "without --strict a missing sibling checkout makes this report green having checked nothing"
+    )
