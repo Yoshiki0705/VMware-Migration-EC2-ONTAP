@@ -151,6 +151,11 @@ outgoing-probes: ## 姉妹リポジトリから引用した主張が生きてい
 	$(PYTHON) tools/check_outgoing_probes.py --selftest >/dev/null
 	$(PYTHON) tools/check_outgoing_probes.py $(OUTGOING_PROBE_FLAGS)
 
+.PHONY: incoming-probes
+incoming-probes: ## 姉妹リポジトリがこちらから引用した文が、こちらの編集で消えていないか
+	$(PYTHON) tools/check_incoming_probes.py --selftest >/dev/null
+	$(PYTHON) tools/check_incoming_probes.py $(OUTGOING_PROBE_FLAGS)
+
 .PHONY: diagrams
 diagrams: ## 図を再生成し SVG / PNG を書き出す（AWS アイコンパッケージと draw.io が必要）
 	$(PYTHON) tools/build_diagrams.py --write --export
@@ -171,7 +176,7 @@ drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow out
 # 以前は Makefile のコメントが「diagram-fonts / diagram-flow は CI で常時走らせる」と
 # 書いているのに ci.yml が drift を呼んでおらず、3 つの図の検査が一度も CI で走って
 # いなかった。集合を 2 か所に書くと、片方だけが更新される。
-gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow outgoing-probes ## どこでも走る検査（CI とフックが呼ぶ）
+gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow outgoing-probes incoming-probes ## どこでも走る検査（CI とフックが呼ぶ）
 
 .PHONY: ci
 ci: gates agent-config ## CI が呼ぶ集約ターゲット（gates + ~/.kiro 依存の到達性検査）

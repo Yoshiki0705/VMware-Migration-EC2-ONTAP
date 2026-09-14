@@ -106,6 +106,14 @@ jobs:
           OUTGOING_PROBE_FLAGS: --strict
         run: make outgoing-probes
 
+      # 逆方向。**こちらの編集で、姉妹が引いた文が消えていないか。** 失敗の原因は
+      # 目の前の diff なので、こちらのほうが merge の判断に直接効く。
+      - name: Claims cited from this repository
+        env:
+          SIBLING_ROOT: siblings
+          OUTGOING_PROBE_FLAGS: --strict
+        run: make incoming-probes
+
   shellcheck:
     name: Shell script lint
     runs-on: ubuntu-latest
