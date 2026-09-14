@@ -34,6 +34,13 @@
 
     python3 tools/check_repo_names.py --selftest   # 抽出と比較の能力（ネットワーク不要）
     python3 tools/check_repo_names.py              # リポジトリ全体（ネットワーク必要）
+    python3 tools/check_repo_names.py --include-private   # 下書きと内部ノートも含める（同上）
+
+`.private/` は既定で除外する。gitignore なので CI には存在せず、既定に入れると「ローカルでは
+落ちるが CI では緑」という差が生まれる。**それでも下書きは公開面である** — はてなに保存された
+時点で読者に届く。そして **リポジトリ名を手で書いた URL は、隣のディレクトリ名をそのまま
+書いても気づけない**（ローカルのディレクトリ名は GitHub のリポジトリ名ではない。姉妹リポジトリが
+実際にこれで 404 を 4 本作っている）。公開前の監査では `--include-private` で 1 度通す。
 
 未認証の API は 1 時間 60 回で、この file を触りながら試すと足りない。
 `GITHUB_TOKEN` があれば読み、5,000 回に上がる。追加の permission は要らない。
@@ -90,16 +97,19 @@ def references(text: str) -> set[str]:
     return {repo for repo in found if repo}
 
 
-def prose_files() -> list[Path]:
+def prose_files(skip: set[str] | None = None) -> list[Path]:
+    skipped = SKIP if skip is None else skip
     return sorted(
-        p for p in ROOT.rglob("*.md") if not any(part in SKIP for part in p.relative_to(ROOT).parts)
+        p
+        for p in ROOT.rglob("*.md")
+        if not any(part in skipped for part in p.relative_to(ROOT).parts)
     )
 
 
-def collect() -> dict[str, list[str]]:
+def collect(skip: set[str] | None = None) -> dict[str, list[str]]:
     """リポジトリ名 → それを書いているファイルの一覧。"""
     seen: dict[str, list[str]] = {}
-    for path in prose_files():
+    for path in prose_files(skip):
         rel = path.relative_to(ROOT).as_posix()
         for repo in sorted(references(path.read_text(encoding="utf-8"))):
             seen.setdefault(repo, [])
@@ -176,7 +186,10 @@ def main() -> int:
     if "--selftest" in sys.argv:
         return selftest()
 
-    seen = collect()
+    # `.private/` は gitignore なので CI には存在しない。既定で走査すると「ローカルでは落ちるが
+    # CI では緑」という差が生まれるので、**明示したときだけ広げる。**
+    skip = SKIP - {".private"} if "--include-private" in sys.argv else SKIP
+    seen = collect(skip)
     if not seen:
         print("repo names: no GitHub repository reference found")
         return 0

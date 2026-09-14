@@ -106,6 +106,13 @@ repo-names: ## 散文中のリポジトリ名がいまの名前か（旧名は G
 	$(PYTHON) tools/check_repo_names.py --selftest >/dev/null
 	$(PYTHON) tools/check_repo_names.py
 
+# `.private/` は gitignore なので CI には無い。**公開面の下書きを含めるのはローカルだけ**で、
+# 既定に入れると「ローカルでは落ちるが CI では緑」になる。公開前の監査で 1 度通す。
+.PHONY: repo-names-private
+repo-names-private: ## 下書き・内部ノートのリポジトリ名まで含める（ローカル専用・ネットワーク必要）
+	$(PYTHON) tools/check_repo_names.py --selftest >/dev/null
+	$(PYTHON) tools/check_repo_names.py --include-private
+
 .PHONY: agent-config
 agent-config: ## steering / skills / hooks の到達性（グローバル検証器）
 	$(PYTHON) $${KIRO_HOME:-$$HOME/.kiro}/hooks/scripts/validate_agent_config.py
