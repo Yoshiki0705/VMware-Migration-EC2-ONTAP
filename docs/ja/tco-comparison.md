@@ -425,7 +425,7 @@ python3 scripts/cost_comparison.py --workload database --data-size 20480
 python3 scripts/cost_comparison.py --check-prices
 ```
 
-**単価は 19 件すべて SKU と usagetype を持っています。** `--check-prices` は API の
+**単価は 30 件すべて SKU と usagetype を持っています。** `--check-prices` は API の
 `pricePerUnit` と 1 件ずつ比較し、ずれた項目名と両方の値を出して終了コード 1 で落ちます。
 
 ## 関連ドキュメント
