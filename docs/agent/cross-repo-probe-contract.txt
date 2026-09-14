@@ -141,19 +141,53 @@
 #     bullet disappears they have measured both on one filesystem, and the ratio becomes citable.
 #   - their own instruction not to generalise the missing ANA multipath to "on AL2023". If it
 #     disappears they have recorded the kernel version and the limitation can be stated precisely.
+# ---------------------------------------------------------------------------------------------------
+# Observation and interpretation, audited 2026-09-14
+#
+# **A cited sentence often carries a measurement and a conclusion, and registering one of them leaves
+# the other unguarded.** Whichever half is restated here needs a probe; otherwise the sibling can
+# withdraw the half this repository relies on while the registration stays green.
+#
+# Rule for new rows: if the cited sentence carries both, register both, or state which half is
+# restated here and register that one.
+#
+# The audit of all rows found two gaps and both are now registered:
+#
+#   `同じ状態でも受け付け` -- the exit from the teardown trap. `CloudFormation は削除を呼ぶ前に
+#   この値を見て断る` was registered, but dr-snapmirror-runbook.md restates the other half too, that
+#   `aws fsx delete-storage-virtual-machine` is accepted at MISCONFIGURED. Without this row, the
+#   recovery step here could lose its basis with nothing failing.
+#
+#   `ホストを経由するのでコピーが 1 本発生します` -- ontap-capability-selection-factors.md restates
+#   both that FlexClone removes the impact rather than the copy (registered) and that a host-mediated
+#   route still produces one copy (was not).
+#
+# Two rows back statements that currently live only in the blog drafts under `.private/`, which
+# restate more than the tracked documents do: `run の中では安定しているので、測定のばらつきではない`
+# and `どの形状の I/O を測ったかで`. The drafts are a publication surface -- one is already saved as a
+# Hatena draft -- so their basis is registered like any other.
+#
+# One case that is deliberately not registered: the playbook's `crash-consistent です` half. This
+# repository states the same fact from AWS and NetApp documentation rather than from their note, so
+# their withdrawing it would not remove the basis here.
+# ---------------------------------------------------------------------------------------------------
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	FlexClone が省くのは本番への影響です
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	アプリケーション側の保証は受けていません
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	ホストを経由するのでコピーが 1 本発生します
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	「AL2023 では」と一般化しない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	同一ファイルシステム上での iSCSI と NVMe/TCP の比較
 S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	CloudFormation は削除を呼ぶ前にこの値を見て断る
 S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	この種類のボリュームは最低 50 GB
 S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	同じスタック削除が検証ホストを先に消す
+S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	同じ状態でも受け付け
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	reread	分母と分子が別のファイルシステムから来ており
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 → 2 では逐次スループットが 1 バイトも動かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	36 を要求しても 4 のままだった
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	9.08 Gbps を運んでおり、同じ上限には当たっていない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	run の中では安定しているので、測定のばらつきではない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	「1 接続」では iSCSI が速く、documented な手順のままでは NVMe/TCP が速い
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	この算術は両方向に外れる
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	どの形状の I/O を測ったかで
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	どれが当たっているかを検証していないので、原因を書かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	セッション数を帯域の割り算で決める形そのものが成立していない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	ファイルシステムを載せた場合の値ではない
