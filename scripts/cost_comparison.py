@@ -387,6 +387,14 @@ EBS_RATES: dict[str, Rate] = {
 # 月額換算に使う時間数。AWS の FSR の例も 30 日 = 720 時間で計算している。
 HOURS_PER_MONTH = 720
 
+# DR の選択肢ごとの単価。**「クローンは安い」は比較対象を決めないと成立しない。**
+# FSx のバックアップは消費量課金で、効率化がバックアップデータには常に有効。
+BACKUP_RATES: dict[str, Rate] = {
+    "fsxn_backup": Rate(
+        0.050, "GB-Mo", "DM6MNVSU4NJNEFT4", "APN1-BackupUsage", "FSx for ONTAP バックアップ"
+    ),
+}
+
 GP3_BASELINE_IOPS = 3000
 GP3_BASELINE_THROUGHPUT_MBPS = 125
 IO2_TIER1_LIMIT = 32_000
@@ -1470,6 +1478,75 @@ def compare_two_site_dr(
     }
 
 
+def compare_dr_options(
+    protected_gb: float,
+    dr_throughput_mbps: int,
+    dr_deployment: str = "SINGLE_AZ_1",
+    efficiency_ratio: float = EFFICIENCY_BY_WORKLOAD["vm"],
+    tiering_policy: str = "snapshot-only",
+    dr_clone_count: int = 1,
+    clone_delta_ratio: float = 0.10,
+) -> list[dict]:
+    """DR の選択肢を並べる。**「クローンで DR が安くなる」は比較対象で決まる。**
+
+    3 つを並べる。
+
+      1. **バックアップのみ** — 二次側のファイルシステムを持たない。保管料だけで最も安いが、
+         復元に時間がかかり、待機系が無い。**RTO を要件にしないときの選択肢である。**
+      2. **SnapMirror + FlexClone** — 二次側のファイルシステムを持つ。RPO 5 分・RTO 数分で、
+         **複製を止めずに検証できる。** 二次側の最小 SSD とスループット容量が固定費として乗る。
+      3. **SnapMirror のみ（検証しない）** — 2 と同じ固定費で、クローンぶんだけ安い。
+         **差が小さいことが、2 を選ぶ理由になる。**
+
+    **1 と 2 の差は容量ではなく RTO / RPO の要件で決まる。** 二次側の費用はスループット容量が
+    大半を占めるため、保護するデータ量を増やしても 1 が 2 に追いつくとは限らない。
+    """
+    physical_gb = protected_gb * efficiency_ratio
+    backup_only = physical_gb * BACKUP_RATES["fsxn_backup"].api_price
+
+    def _secondary(clones: int) -> float:
+        return calculate_fsxn_cost(
+            protected_gb * (1 + clones * clone_delta_ratio),
+            dr_throughput_mbps,
+            deployment=dr_deployment,
+            efficiency_ratio=efficiency_ratio,
+            hot_ratio=1.0,
+            tiering_policy=tiering_policy,
+        )["total_monthly_usd"]
+
+    with_clone = _secondary(dr_clone_count)
+    without_clone = _secondary(0)
+
+    return [
+        {
+            "option": "バックアップのみ（二次側のファイルシステムなし）",
+            "monthly_usd": round(backup_only, 2),
+            "rpo": "バックアップ間隔",
+            "rto": "**復元に時間がかかる。** 待機系が無い",
+            "testable_without_stopping": False,
+            "note": f"効率化後 {physical_gb:,.0f} GB × ${BACKUP_RATES['fsxn_backup'].api_price}/GB-月。"
+            "**バックアップデータには効率化が常に有効**",
+        },
+        {
+            "option": "SnapMirror のみ（DR クローンを持たない）",
+            "monthly_usd": without_clone,
+            "rpo": "5 分",
+            "rto": "数分",
+            "testable_without_stopping": False,
+            "note": "**検証するには複製を止めるか、別に容量を用意する必要があります**",
+        },
+        {
+            "option": f"SnapMirror + FlexClone（DR クローン {dr_clone_count} 本）",
+            "monthly_usd": with_clone,
+            "rpo": "5 分",
+            "rto": "数分",
+            "testable_without_stopping": True,
+            "note": f"**クローンの追加分は ${with_clone - without_clone:,.2f}。**"
+            "複製を止めずに検証できます",
+        },
+    ]
+
+
 def find_crossover(
     data_gb_per_vm: float,
     aggregate_throughput_mbps: int,
@@ -1514,6 +1591,8 @@ def check_prices(region: str = REGION) -> list[str]:
         pins.append((f"AmazonEC2/{key}", "AmazonEC2", rate))
     for key, rate in SNAPSHOT_RATES.items():
         pins.append((f"AmazonEC2/snapshot_{key}", "AmazonEC2", rate))
+    for key, rate in BACKUP_RATES.items():
+        pins.append((f"AmazonFSx/{key}", "AmazonFSx", rate))
     for key, rate in TRANSFER_RATES.items():
         pins.append((f"AWSDataTransfer/{key}", "AWSDataTransfer", rate))
 
@@ -2139,6 +2218,7 @@ def main() -> int:
             + len(EBS_RATES)
             + len(SNAPSHOT_RATES)
             + len(TRANSFER_RATES)
+            + len(BACKUP_RATES)
         )
         print(f"prices: {total} 件すべて API と一致（{REGION}、固定日 {PRICING_PINNED_AT}）")
         return 0

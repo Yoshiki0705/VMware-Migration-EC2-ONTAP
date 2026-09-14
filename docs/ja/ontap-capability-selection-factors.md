@@ -63,15 +63,37 @@ NetApp の記事に示された 2 つのワークフローと配置図をもと�
 **回すたびにクローンを捨てて作り直すのが前提です。** 分離（split）すると共有をやめるので、
 容量の利点も失われます。
 
-> **クローンの整合性は crash-consistent です。アプリケーション側の保証は受けていません。**
-> LUN の Snapshot は既定で crash-consistent なので、クローンをマウントした時点で `fsck` や
-> `chkdsk` が走る可能性があります。**「本番と同じデータでテストできる」は、
-> 「本番と同じ整合性が得られる」ではありません。**
-> アプリケーション整合性が必要なら、静止点を作る仕組みを別に用意してください
-> （[FSx for ONTAP Adoption Playbook: ブロックからファイルへ運ぶ経路の比較](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/block-to-file-routes.md)）。
+> **クローンは、土台にしたスナップショットの整合性を継承します。**
+> FSx for ONTAP のスナップショットは**既定では crash-consistent** で、
+> アプリケーション整合性を得るにはデータベースの I/O を静止させる必要があります
+> （[出典](https://aws.amazon.com/blogs/storage/using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap-to-protect-your-sql-server-workloads/)）。
+> **したがって「クローンはアプリ整合性が取れない」ではありません。** 静止させたスナップショットから
+> クローンを作れば、そのクローンはアプリケーション整合性を持ちます。詳細は
+> [アプリケーション整合性の取り方](#アプリケーション整合性の取り方)。
 >
 > **FlexClone が省くのは本番への影響で、コピーそのものではありません。** ホストを経由する経路では
-> コピーが 1 本発生します。
+> コピーが 1 本発生します
+> （[FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/comparison/block-to-file-routes.md)）。
+
+### アプリケーション整合性の取り方
+
+**既定のスナップショットポリシーが作るスナップショットはアプリケーション整合性を持ちません。**
+方法は 2 つあり、どちらも AWS が手順を公開しています。
+
+| 方法 | 内容 | 出典 |
+|---|---|---|
+| **SnapCenter** | アプリケーション別のプラグイン（SQL Server / Oracle など）で整合性のあるスナップショットを作成し、**保護・複製・クローンまで行えます。** FSx for ONTAP での利用に**追加ライセンスは不要**です | [SQL Server](https://aws.amazon.com/blogs/storage/using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap-to-protect-your-sql-server-workloads/) / [Oracle](https://aws.amazon.com/blogs/storage/protect-your-oracle-databases-on-amazon-ec2-using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap/) |
+| **手動で静止点を作る** | 例（Oracle）: `ALTER DATABASE BEGIN BACKUP` → `vol snapshot create` → `ALTER DATABASE END BACKUP`。その後 `snapmirror update -source-snapshot` で二次側へ運び、クローンします | [Cloning](https://aws.amazon.com/blogs/storage/accelerate-development-refresh-cycles-and-optimize-cost-with-amazon-fsx-for-netapp-ontap-cloning/) |
+
+**SnapCenter を使う場合の前提が 3 つあります。**
+
+- **ボリュームのスナップショットポリシーを `none` にします。** 自動スナップショットは
+  アプリケーション整合性を持たないため、混ざると復旧時にどれが使えるか分からなくなります
+- **データベースのワークロードをボリューム / ファイルシステムで分けます**
+- **クローンのメタデータ用にボリューム容量の 0.5% 以上を空けます**
+
+出典: [Oracle 向けのベストプラクティス](https://aws.amazon.com/blogs/storage/protect-your-oracle-databases-on-amazon-ec2-using-netapp-snapcenter-with-amazon-fsx-for-netapp-ontap/)。
+**SnapCenter はこのプロジェクトでは未検証です。**
 
 ### パターン B: ディザスタリカバリ（Mirror → Test → Activate）
 
@@ -125,6 +147,52 @@ FlexClone で止まる理由を「ONTAP がボリューム移動時にクロー�
 **二次側の内訳は SSD 1,024 GiB が $153.60、スループット容量が $463.87 で、
 スループットが 75% を占めます。** DR クローンの容量が小さくても、この 2 つは減りません。
 **「クローンは容量を消費しないから DR は安い」とは言えません。**
+
+## DR の費用と、クローンが安くなる条件
+
+**「クローンは容量を消費しないから DR は安い」は、比較対象を決めれば正しくなります。**
+何と比べるかで結論が変わるので、3 つ並べます。
+
+保護対象 2,048 GB、効率化 70%、DR 側 512 MB/s・Single-AZ、階層化なし:
+
+| 選択肢 | 月額 | RPO | RTO | 複製を止めずに検証 |
+|---|---|---|---|---|
+| バックアップのみ（二次側のファイルシステムなし） | **$30.72** | バックアップ間隔 | **復元に時間がかかる。待機系なし** | 不可 |
+| SnapMirror のみ | $617.47 | 5 分 | 数分 | 不可 |
+| **SnapMirror + FlexClone（DR クローン 1 本）** | **$617.47** | 5 分 | 数分 | **可** |
+
+**2 つのことが同時に言えます。**
+
+**1. DR クローンの追加分は $0.00 です。** 二次側は最小 SSD 1,024 GiB の床に当たっているので、
+クローン 1 本ぶんの差分では請求が動きません。**SnapMirror を持っているなら、
+DR の検証は追加費用なしで行えます。** これが「クローンで DR が安くなる」の正確な意味です。
+
+**2. その二次側そのものは、バックアップのみの 20.1 倍です。** DR 側のスループット容量を
+下げても差は残ります。
+
+| DR 側のスループット | バックアップのみ | SnapMirror + Clone | 倍率 |
+|---|---|---|---|
+| 128 MB/s | $30.72 | $269.57 | 8.8 倍 |
+| 256 MB/s | $30.72 | $385.54 | 12.6 倍 |
+| 512 MB/s | $30.72 | $617.47 | 20.1 倍 |
+
+**つまり条件はこうです。**
+
+| 条件 | 安くなるか |
+|---|---|
+| **RPO 5 分・RTO 数分の待機系が要件である** | **なる。** その待機系を持つ前提では、検証のためのクローンが実質無料 |
+| 同じデータの面を複数持つ（DR 検証 + 開発 + QA） | **なる。** 面の数だけ容量が増えないため |
+| RTO を要件にしない（復元に時間をかけられる） | **ならない。** バックアップのみが 8.8〜20 倍安い |
+| 保護データ量を増やせば逆転するか | **しない。** 二次側の費用はスループット容量が大半で、容量に比例しない |
+
+**バックアップの単価は $0.050/GB-月**（消費量課金）で、**バックアップデータには効率化が
+常に有効**です。AWS Backup から FSx for ONTAP を保護する場合も、
+このバックアップ課金が土台になります。
+
+> **論理エアギャップ保管庫（LAGV）の単価は別です。** Price List API では FSx-Windows /
+> FSx-Lustre / FSx-OpenZFS の LAGV 温存ストレージが $0.0575/GB-月で見つかりましたが、
+> **FSx for ONTAP の LAGV 項目はこの照会では見つかりませんでした。**
+> 「非対応」ではなく「この照会では確認できていない」という状態です。
 
 ## 機能ごとの選定要素
 
@@ -184,6 +252,9 @@ SnapMirror は親ボリュームへの複製を続けます。**検証のため�
 | できること | 必要な分だけを取得するスパースなキャッシュ。オンプレ ↔ FSx、FSx ↔ FSx の組み合わせが可能 |
 | 向く条件 | **読み取り中心で、変更が少ないワークロード。** 変更があるとキャッシュの更新が必要です |
 | EBS で対応する手段 | 該当なし（[出典](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-flexcache.html)） |
+| **制約 1** | **Cache ボリュームは 50 GB 未満で作れません。** `Volumes of this type must be at least 50GB` で失敗します |
+| **制約 2** | **FSx for ONTAP のアグリゲートは FabricPool 有効なので、階層化アグリゲートを明示的に許可しないと作成が失敗します**（`Aggregates not matching FabricPool requirements`）。既定は無効です |
+| 出典 | 姉妹プロジェクトの実測（[FlexCache の検証](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/a97a4ec/docs/ja/verification/flexcache-security-style-inheritance.md)）。**こちらの実測ではありません** |
 
 ### マルチプロトコル — 同じボリュームへの NFS / SMB / iSCSI / NVMe
 

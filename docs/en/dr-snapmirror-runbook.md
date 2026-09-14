@@ -154,7 +154,68 @@ volume clone ... / lun mapping delete ... / volume destroy <dst_vol>_drtest
 
 ---
 
-## 8. Risks and Considerations
+## 8. Teardown (undoing 3.2)
+
+**If 3.2 created peers, teardown has to remove them.** Deleting the FSx for ONTAP stack without
+removing them stalls. Measured by a sibling project on 2026-09-13 (ONTAP 9.18.1P6, ap-northeast-1;
+[source](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/a97a4ec/docs/ja/verification/flexcache-security-style-inheritance.md)).
+
+> **Remove the peers while the host is still alive.** Get the order wrong and the same stack deletion
+> removes the only host that can issue the removal.
+
+### 8.1 The correct order
+
+```text
+# 1) Release the SnapMirror relationship
+snapmirror delete -destination-path <fsxn-svm>:<dest-volume>
+snapmirror release -destination-path <fsxn-svm>:<dest-volume>   # on the source
+
+# 2) Delete the SVM peer (**while the host is still alive**)
+vserver peer delete -vserver <onprem-svm> -peer-vserver <fsxn-svm>
+
+# 3) Delete the cluster peer
+cluster peer delete -peer-cluster <fsxn-cluster>
+
+# 4) Remove security group rules added by hand that reference another stack's SG
+#    Left in place, they fail the referenced SG's deletion with a dependency error
+
+# 5) Delete the stack
+aws cloudformation delete-stack --stack-name <stack>
+```
+
+### 8.2 Recovering from the wrong order
+
+**There are four stages, and the last two only appear once the order has gone wrong.**
+
+| Stage | Symptom |
+|---|---|
+| 1 | With the SVM peer still present, FSx for ONTAP does not delete the SVM and the stack fails with `svmLifecycle should be DELETING, but get: MISCONFIGURED` |
+| 2 | **The same stack deletion removes the only host that can run `vserver peer delete`.** The management LIF is a private address, so once the verification host is gone ONTAP is unreachable by REST and CLI alike |
+| 3 | Removing the peer leaves `Lifecycle` at `MISCONFIGURED`, and **CloudFormation reads that value and refuses before calling delete** |
+| 4 | Security group rules added by hand block deletion of the referenced group |
+
+Recovery order:
+
+```text
+# 1) Rebuild a host that can reach ONTAP (a t3.micro is enough)
+# 2) Remove the peers (8.1 steps 2-3)
+# 3) **Delete the SVM directly through the FSx for ONTAP API.**
+#    delete-storage-virtual-machine is accepted even at MISCONFIGURED and moves to DELETING
+aws fsx delete-storage-virtual-machine --storage-virtual-machine-id <svm-id>
+# 4) Retry the stack deletion
+```
+
+### 8.3 Whether a final backup is left behind
+
+**It depends on the deletion path.** In the sibling project's measurements, the two volumes deleted by
+CloudFormation left a final backup and the four deleted through the ONTAP REST API did not.
+**Count them after teardown.**
+
+```bash
+aws fsx describe-backups --query 'Backups[].{Id:BackupId,Vol:Volume.Name,Type:Type}' --output table
+```
+
+## 9. Risks and Considerations
 
 | Risk | Impact | Mitigation |
 |------|--------|-----------|
