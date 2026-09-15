@@ -201,6 +201,34 @@
 # One case that is deliberately not registered: the playbook's `crash-consistent です` half. This
 # repository states the same fact from AWS and NetApp documentation rather than from their note, so
 # their withdrawing it would not remove the basis here.
+#
+# ---------------------------------------------------------------------------------------------------
+# THE HOLE A PROBE CANNOT SEE, AND WHAT NOW NARROWS IT
+#
+# A superseded sentence is one that is still there, so presence is satisfied and this check stays
+# green while the finding underneath has been overturned. **It happened twice in two rounds here, and
+# both times it was caught by reading their new section, not by this gate.** Reading is not a control.
+#
+# S3-Burst-on-ONTAP-Files now publishes `docs/agent/superseded-claims.txt`, the supersessions they know
+# about, each naming the section that replaced the statement. `make outgoing-probes` reads it and warns
+# when a registered string appears there -- the check runs in the opposite direction from a probe, on a
+# string that is present rather than absent.
+#
+# **It inherits their coverage.** A supersession nobody registered stays invisible on both sides, so
+# this narrows the gap rather than closing it, and the generative rule still has to be applied by hand:
+# when a measurement lands, look first for the sentences it overturns. An absent registry is the normal
+# case and is not an error -- most repositories publish none.
+#
+# The registry is read at `origin/main`, like the cited files: an entry that exists only in somebody's
+# working tree is an editing state, not a declaration a reader can look up.
+#
+# One row is warned about today and **stays registered**:
+# `9.08 Gbps を運んでおり、同じ上限には当たっていない`, superseded by their
+# `#59164-の正体と-ana-経路の寄与`. They kept the wording and appended the update beneath it, which is
+# the shape that keeps a probe honest, so retiring the row would lose the anchor while the sentence
+# still exists. What changed is on this side: the absence it carried has narrowed from "the cause is
+# unconfirmed" to "what decides which of the two tiers is unconfirmed", and
+# cross-repo-block-performance.md now says that instead.
 # ---------------------------------------------------------------------------------------------------
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	FlexClone が省くのは本番への影響です
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	アプリケーション側の保証は受けていません
