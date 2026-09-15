@@ -29,11 +29,26 @@ def git(cwd: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def make_checkout(root: Path, committed: str | None, worktree: str | None) -> Path:
+def write(root: Path, path: str, body: str) -> None:
+    target = root / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+
+
+def make_checkout(
+    root: Path,
+    committed: str | None,
+    worktree: str | None,
+    also_committed: dict[str, str] | None = None,
+    also_worktree: dict[str, str] | None = None,
+) -> Path:
     """A checkout with `origin/main`, whose committed and working-tree bodies can differ.
 
     `origin/main` is made by cloning, so the ref is real rather than a hand-written file: the
     checker asks git for it and a fabricated ref would not answer the same way.
+
+    `also_committed` / `also_worktree` place further files on either side, which is how the
+    supersession registry gets tested at both the published ref and in the working tree only.
     """
     upstream = root / "upstream.git"
     upstream.mkdir()
@@ -45,13 +60,14 @@ def make_checkout(root: Path, committed: str | None, worktree: str | None) -> Pa
     git(seed, "config", "user.email", "test@example.invalid")
     git(seed, "config", "user.name", "test")
     if committed is not None:
-        target = seed / CITED
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(committed, encoding="utf-8")
+        write(seed, CITED, committed)
         git(seed, "add", CITED)
     else:
         (seed / "README.md").write_text("placeholder\n", encoding="utf-8")
         git(seed, "add", "README.md")
+    for path, body in (also_committed or {}).items():
+        write(seed, path, body)
+        git(seed, "add", path)
     git(seed, "commit", "--quiet", "-m", "seed")
     git(seed, "remote", "add", "origin", str(upstream))
     git(seed, "push", "--quiet", "origin", "main")
@@ -64,8 +80,9 @@ def make_checkout(root: Path, committed: str | None, worktree: str | None) -> Pa
         if target.exists():
             target.unlink()
     else:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(worktree, encoding="utf-8")
+        write(checkout, CITED, worktree)
+    for path, body in (also_worktree or {}).items():
+        write(checkout, path, body)
     return checkout
 
 
@@ -236,6 +253,77 @@ def test_weakness_is_reported_for_a_reread_probe_too(tmp_path: Path) -> None:
     result = run(tmp_path, make_contract(tmp_path, role="reread"))
     assert result.returncode == 0, result.stdout
     assert "occurs 3 times" in result.stdout
+
+
+REGISTRY = "docs/agent/superseded-claims.txt"
+SUPERSEDING_ANCHOR = "#新しい実測"
+
+
+def registry(path: str, string: str, anchor: str = SUPERSEDING_ANCHOR) -> str:
+    return f"# owner-declared supersessions\n{path}\t{string}\t{anchor}\n"
+
+
+def test_a_superseded_claim_that_is_still_present_is_reported(tmp_path: Path) -> None:
+    """The hole a probe cannot see.
+
+    The sentence is where it was registered, so presence is satisfied and the check stays green,
+    while the finding underneath it has been overturned. This side missed that twice in two rounds
+    and both times only by reading the sibling's new section. Reported rather than failed: the
+    citation may still be usable once someone reads the superseding section.
+    """
+    body = f"**{CLAIM}。**\n"
+    make_checkout(
+        tmp_path,
+        committed=body,
+        worktree=body,
+        also_committed={REGISTRY: registry(CITED, CLAIM)},
+    )
+    result = run(tmp_path, make_contract(tmp_path))
+    assert result.returncode == 0, result.stdout
+    assert "declare it superseded" in result.stdout
+    assert SUPERSEDING_ANCHOR in result.stdout
+
+
+def test_a_claim_absent_from_the_registry_is_not_reported(tmp_path: Path) -> None:
+    """The boundary. Written so that removing the detection leaves this test passing -- if it failed
+    too, the pair would only show that the checker prints something."""
+    body = f"**{CLAIM}。**\n"
+    make_checkout(
+        tmp_path,
+        committed=body,
+        worktree=body,
+        also_committed={REGISTRY: registry(CITED, "別の主張")},
+    )
+    result = run(tmp_path, make_contract(tmp_path))
+    assert result.returncode == 0, result.stdout
+    assert "superseded" not in result.stdout
+
+
+def test_a_missing_supersession_registry_is_not_an_error(tmp_path: Path) -> None:
+    """Most repositories publish no registry, and that is the normal case rather than a fault."""
+    body = f"**{CLAIM}。**\n"
+    make_checkout(tmp_path, committed=body, worktree=body)
+    result = run(tmp_path, make_contract(tmp_path))
+    assert result.returncode == 0, result.stdout
+    assert "superseded" not in result.stdout
+
+
+def test_an_unpushed_registry_entry_does_not_raise_a_supersession(tmp_path: Path) -> None:
+    """The registry is read the same way the cited files are: at `origin/main`.
+
+    An entry that exists only in somebody's working tree is an editing state, not a declaration the
+    owner has published, and reading it here would report a supersession nobody can look up.
+    """
+    body = f"**{CLAIM}。**\n"
+    make_checkout(
+        tmp_path,
+        committed=body,
+        worktree=body,
+        also_worktree={REGISTRY: registry(CITED, CLAIM)},
+    )
+    result = run(tmp_path, make_contract(tmp_path))
+    assert result.returncode == 0, result.stdout
+    assert "superseded" not in result.stdout
 
 
 def test_the_shape_is_recomputed_from_the_registrations(tmp_path: Path) -> None:

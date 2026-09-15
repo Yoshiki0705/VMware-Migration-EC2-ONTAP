@@ -156,6 +156,41 @@ def answers_for_published_ref(checkout: Path) -> bool:
     return git(checkout, "rev-parse", "--verify", "--quiet", PUBLISHED_REF).returncode == 0
 
 
+SUPERSEDED_REGISTRY = "docs/agent/superseded-claims.txt"
+
+
+def superseded(checkout: Path, published: bool) -> dict[tuple[str, str], str]:
+    """`(cited path, string) -> anchor of the section that superseded it`, as the owner declares it.
+
+    **A probe cannot see this.** It fires when a string disappears, and a superseded sentence is one
+    that is still there, so the check stays green while the claim underneath it has been overturned.
+    This repository hit that twice in two rounds and both times noticed only by reading the sibling's
+    new section.
+
+    S3-Burst-on-ONTAP-Files publishes the supersessions it knows about. Reading their registry turns
+    their declaration into a warning here. **It inherits their coverage**: a supersession nobody
+    registered stays invisible on both sides, so this narrows the gap rather than closing it.
+
+    Absent registry is normal -- most repositories do not publish one -- and is not an error.
+    """
+    if published:
+        shown = git(checkout, "show", f"{PUBLISHED_REF}:{SUPERSEDED_REGISTRY}")
+        body = shown.stdout if shown.returncode == 0 else ""
+    else:
+        local = checkout / SUPERSEDED_REGISTRY
+        body = local.read_text(encoding="utf-8", errors="replace") if local.exists() else ""
+    out: dict[tuple[str, str], str] = {}
+    for line in body.splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 3:
+            continue
+        path, string, anchor = fields
+        out[(path, string)] = anchor
+    return out
+
+
 class Read(NamedTuple):
     body: str | None
     from_published_ref: bool
@@ -260,6 +295,7 @@ def main() -> int:
     fell_back: set[str] = set()
     checked = 0
     published: dict[str, bool] = {}
+    declared: dict[str, dict[tuple[str, str], str]] = {}
 
     for probe in probes:
         checkout = locate(probe.repo)
@@ -285,6 +321,15 @@ def main() -> int:
             )
             (failures if probe.role == FAIL_ROLE else warnings).append(message)
             continue
+        if probe.repo not in declared:
+            declared[probe.repo] = superseded(checkout, published[probe.repo])
+        anchor = declared[probe.repo].get((probe.path, probe.probe))
+        if anchor is not None:
+            warnings.append(
+                f"{probe.repo}: {probe.probe!r} is still present but they declare it superseded by "
+                f"{probe.path}{anchor} (line {probe.line}). **A probe cannot see this** -- read that "
+                "section and decide whether the citation here still says what it meant."
+            )
         if occurrences > 1:
             # Reported, not failed. The claim still resolves; what is weak is the anchor. Failing
             # on it would put "the claim was withdrawn" and "this string is a fragile anchor" behind
