@@ -415,8 +415,11 @@ charge even when accessed from an AZ other than the preferred one.**
 - **EBS snapshot storage**: stored in S3 and billed by size
 - **Data transfer**: across AZs and Regions. Multi-AZ replication between nodes is included in
   the throughput capacity charge
-- **Migration tooling**: the cost of AWS Transform or Shift Toolkit, and the period during which
-  capacity is held on both sides
+- **Migration tooling**: **the AWS Transform VMware migration agent is free**, so what is excluded
+  here is the cost of Shift Toolkit (unverified) and the period during which capacity is held on
+  both sides. The cost of resources ATX has you create is separate, and the NLB that survives
+  Finalize remains uncalculated (9.9 and U17 in the
+  [GA verification report](atx-fsxn-ga-verification.md))
 - **Licensing**: OS and application license mobility terms
 
 ## Reproducing this

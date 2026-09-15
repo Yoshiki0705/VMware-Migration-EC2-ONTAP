@@ -2,7 +2,7 @@
 
 **Purpose**: Establish the scope of Amazon FSx for NetApp ONTAP support GA in AWS Transform (ATX) from primary sources, and record hands-on findings from a verification account (ap-northeast-1) with verified and unverified claims kept separate.
 
-**Last Updated**: 2026-09-11 (documentation-state claims re-checked; the measurements remain those of 2026-09-04)
+**Last Updated**: 2026-09-15 (where the charges land, checked against the pricing page and this account's billing data, added as 9.9; the migration-execution measurements remain those of 2026-09-04)
 **Status**: Measured from scope confirmation through initialization, certificate authentication, saving the configuration, running replication, launching a test instance, and checking data integrity, and **Finalize was run with approval** (12.10). Teardown complete (Section 13)
 
 ---
@@ -553,6 +553,31 @@ On **cutover downtime**, the blog states that the window is limited to the time 
 
 For the same reason, the blog's "Multi-AZ HA with automatic failover and zero RPO" presumes a Multi-AZ deployment. Both file systems in this verification environment are Single-AZ, so that characteristic does not apply here (5.1).
 
+### 9.9 Where the charges land [Documented + Measured / 2026-09-15]
+
+**Leaving an ATX job idle costs nothing.** A job is designed to wait months for human input, and waiting is not itself billable. Cost arises on the resources ATX has you create.
+
+| Claim | Class | Basis |
+|---|---|---|
+| The VMware migration agent is free to use | [Documented] | The agent table on [AWS Transform pricing](https://aws.amazon.com/transform/pricing/) lists Assessment / Windows / Mainframe / VMware as Free, and the custom transformation agent and continuous modernization as Paid |
+| ATX itself carries no additional charge | [Documented] | [What is AWS Transform?](https://docs.aws.amazon.com/transform/latest/userguide/what-is-service.html): "There are no additional charge to use AWS Transform" |
+| Resources created are billed at standard pricing | [Documented] | The FAQ on the same pricing page. **This is where cost concentrates** |
+| A job waiting for months is the designed shape | [Documented] | The terminology in the same User Guide defines a Job as "A long-running process (weeks/months+)" |
+| Even the paid custom agent does not bill idle time | [Documented] | The same pricing page. The unit is the agent minute, and "You are only charged for active agent work during server-side operations, not for user idle time or client-side operations" |
+| Zero charge after 84 idle days in this account | [Measured] | Below |
+
+**What was measured (2026-09-15)**: job `vmware-to-ec2-fsxn-poc` has been waiting for an inventory upload since 2026-06-23 — **84 days** — still `EXECUTING`, with zero HITL tasks and zero connectors. Cost Explorer was queried for `UnblendedCost` from 2026-06-01 to 2026-09-16, monthly, grouped by `SERVICE`, excluding `Credit` and `Refund`: **no `AWS Transform` key exists in any of the four periods.**
+
+**A control against reading an absent key as a zero row sits inside the same dataset.** A free service still produces a zero-amount row when there is usage. Over the same window `AWS Application Migration Service` appears at $0.00 in September (the end-to-end run was 09-04), and `Amazon Q` appears at $0 in July and August. **ATX has no row at all in any month.** ATX was also actively driven through the console in September, so the absence does not follow from idleness alone.
+
+**What this measurement does not say**:
+
+- One account, one window, **the VMware migration agent path only**. For the paid custom transformation agent the only basis is the [Documented] rows above; it was not measured
+- **It says nothing about the cost of resources created.** U17 (the NLB that survives Finalize) remains uncalculated
+- **Retroactive per-resource attribution is unavailable in this account.** `getCostAndUsageWithResources` restricted to `Amazon Elastic Load Balancing`, daily from 2026-09-02 to 2026-09-16, returns only `NoResourceId`, orders of magnitude below the monthly total (September, $31.32). Resource-level data is not enabled. **Resource-level data reaches back only 14 days**, so the window covering the 09-04 measurement closes around 09-18
+
+**When this needs re-checking**: the pricing page states that "additional future capabilities may be introduced as paid features". **Being free is a dated fact, not a permanent property.** Re-read both sources before switching this path to the custom agent, and before relying on this report over a long period.
+
 ## 10. Coordination with the FSx for ONTAP Adoption Playbook
 
 The sibling repository [FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) contains content that should be updated to reflect this GA.
@@ -612,7 +637,8 @@ The mapping between the Playbook evidence tiers and this report's tags is given 
 | U22 | Official documentation that re-onboarding discards launch-template customizations | Unverified | Measured: the replacement template was created with MGN defaults (12.9). No statement found in public documentation (searched 2026-09-04) |
 | U20 | Whether cutover succeeds after correcting the disk assignment | **Resolved** (12.9) | Re-onboarding produced a consistent assignment, and both boot and data integrity succeeded, confirming the 12.8 diagnosis |
 | U21 | How to make MGN re-evaluate a stale disk assignment | **Resolved** (2026-09-09) | `update-replication-configuration` cannot repair it (three contradictory errors; `isBootDisk` is read-only). **The documented route is rerunning the installer**: [step 6 of the agent installation](https://docs.aws.amazon.com/mgn/latest/ug/linux-agent.html) names it as the way to restore a replicated-disk list that no longer matches the machine. Deleting the source server is not needed; the delete-and-re-onboard used here was the heaviest option available. Whether `stagingDiskType` is re-derived as well is not settled by that text and is unverified |
-| U17 | Billing impact of the NLB | Not calculated (**persistence now known**) | The NLB persists **beyond Finalize, not just for the duration of replication** (12.10), and requires manual teardown. No statement was found in public documentation and the cost was not estimated |
+| U17 | Billing impact of the NLB | Not calculated (**persistence now known, and the retroactive route is closed**) | The NLB persists **beyond Finalize, not just for the duration of replication** (12.10), and requires manual teardown. No statement was found in public documentation and the cost was not estimated. **Resource-level cost data is not enabled in this account, so no amount can be attributed retroactively to the torn-down NLB** (9.9). Calculating it needs another environment with resource-level data enabled before measuring |
+| U24 | Charges while an ATX job sits idle | **Resolved** (9.9) | The VMware migration agent is free. **Measured: a job left idle for 84 days produces no `AWS Transform` row in Cost Explorer.** Cost concentrates on the resources created |
 | U23 | Official documentation that Finalize leaves the NLB and VPC endpoint service | Unverified | Measured: not deleted through T0 + 36 min (12.10). The EBS volumes are deleted after about 33 minutes. No statement found in public documentation (searched 2026-09-04, re-read in full 2026-09-11) |
 
 ### 11.2 Candidate next actions
@@ -623,7 +649,7 @@ The mapping between the Playbook evidence tiers and this report's tags is given 
 |---|---|---|
 | Can be verified further on this environment | U5 (post-migration optimization via `lun move start`), U14 (SVM-scoped certificate) | Both are testable here. For U14, the working cluster-scope setup provides a baseline for comparison |
 | Waiting on public documentation | U6 (minimum ONTAP version), U7 (EVS GA), U13 (the additional-security-group requirement), U22 (template recreation on re-onboarding), U23 (resources left by Finalize) | Wait for updates or ask AWS / NetApp. Treat as [Unverified] until reflected in public docs |
-| Needs a different environment | U19 (extent of delta lost on `SNAPSHOT_FAIL`), U17 (NLB cost) | U19 needs a source with continuous writes; U17 needs billing data |
+| Needs a different environment | U19 (extent of delta lost on `SNAPSHOT_FAIL`), U17 (NLB cost) | U19 needs a source with continuous writes; **U17 cannot be obtained from the existing billing data** (9.9) and needs re-measuring in an environment with resource-level cost data enabled |
 
 **Teardown is required after migration completes.** Finalize does not finish the cleanup (12.10). **The teardown was carried out here, and its dependencies and timings are recorded in Section 13.** Three things warrant attention during teardown.
 
@@ -1124,14 +1150,18 @@ The teardown plan assumed "unmap LUNs → delete LUNs → delete FlexVol", but *
 
 The igroup has no FSx API equivalent, though, so it must be deleted individually over ONTAP REST if the SVM is being kept.
 
-### 13.3 A certificate `fsxadmin` cannot delete
+### 13.3 A certificate whose direct deletion is unsupported
 
-The `security login` could be deleted, but **deleting the client-ca certificate was refused with `fsxadmin` privileges**.
+The `security login` could be deleted, but **deleting the client-ca certificate was refused**.
 
 | Route attempted | Result |
 |---|---|
 | REST `DELETE /api/security/certificates/{uuid}` | **403** `not authorized for that command` (code 6) |
 | private CLI passthrough `DELETE /api/private/cli/security/certificate?...` | **403** identical |
+
+**This section originally gave the cause as "`fsxadmin` privileges". Correcting the attribution.** The [error list for `DELETE /security/certificates`](https://docs.netapp.com/us-en/ontap-restapi/delete-security-certificates-.html#error) in the ONTAP REST API states `Deleting this client_ca certificate directly is not supported.` **Deleting a client_ca certificate directly is unsupported at the API level.**
+
+The wording observed was `not authorized for that command`, so a role-based refusal and an API-level lack of support were not separated by measurement. **Nor do they need to be.** Either way, **there is no "use a more privileged role" workaround** — no role available on FSx for ONTAP permits this operation. That search is not worth the time.
 
 The `security login` deletion has its own gotcha: adding `?application=http` returns **400** `Unexpected argument "application"`. The correct call is `DELETE /api/security/accounts/{owner-uuid}/{name}` with no query parameter.
 
@@ -1211,6 +1241,10 @@ Primary sources only.
 - [Run high-performance workloads with Amazon FSx for NetApp ONTAP (EVS User Guide)](https://docs.aws.amazon.com/evs/latest/userguide/fsx-ontap.html)
 - [What's New: Amazon EVS now integrates with Amazon FSx for NetApp ONTAP](https://aws.amazon.com/about-aws/whats-new/2025/06/amazon-elastic-vmware-service-fsx-netapp-ontap/) — states public preview
 - [Using Amazon Elastic VMware Service with FSx for ONTAP (FSx User Guide)](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/evs-ontap.html)
+
+### NetApp ONTAP
+
+- [ONTAP REST API: `DELETE /security/certificates`](https://docs.netapp.com/us-en/ontap-restapi/delete-security-certificates-.html#error) — the error list carries `Deleting this client_ca certificate directly is not supported.` (the source for the attribution in 13.3)
 
 ### Related repositories
 
