@@ -205,7 +205,6 @@
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	FlexClone が省くのは本番への影響です
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	アプリケーション側の保証は受けていません
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	ホストを経由するのでコピーが 1 本発生します
-S3-Burst-on-ONTAP-Files	docs/ja/verification/block-measurement-runbook.md	reread	「AL2023 では」と一般化しない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	CloudFormation は削除を呼ぶ前にこの値を見て断る
 S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	この種類のボリュームは最低 50 GB
 S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritance.md	retraction	同じスタック削除が検証ホストを先に消す
@@ -213,8 +212,11 @@ S3-Burst-on-ONTAP-Files	docs/ja/verification/flexcache-security-style-inheritanc
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	reread	分母と分子が別のファイルシステムから来ており
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 → 2 では逐次スループットが 1 バイトも動かない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 接続でのプロトコル差は再現しなかった
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	1 接続の値はプロトコルではなくデプロイの性質である
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	36 を要求しても 4 のままだった
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	9.08 Gbps を運んでおり、同じ上限には当たっていない
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	AL2023 のカーネル 3 系統に広がった
+S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	ANA の経路は逐次読みに 1.33 倍の差を作る
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	run の中では安定しているので、測定のばらつきではない
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	この算術は両方向に外れる
 S3-Burst-on-ONTAP-Files	docs/ja/verification/perf-matrix-results.md	retraction	どの形状の I/O を測ったかで
