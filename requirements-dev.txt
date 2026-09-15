@@ -8,7 +8,7 @@
 # disagree about whether the tree was clean.
 #
 # Bump deliberately (Renovate opens the PR); never widen to a range.
-ruff==0.15.20
-cfn-lint==1.52.0
+ruff==0.16.7
+cfn-lint==1.56.3
 pytest==9.1.1
 bandit==1.9.4
