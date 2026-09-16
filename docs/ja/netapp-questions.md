@@ -21,8 +21,12 @@
 | ステータス | 意味 |
 |-----------|------|
 | ✅ 確認済み | 公開ブログ/ドキュメントで回答が得られた |
+| 🔬 実測で確定 | **自環境の実機検証で確定した。**公開ドキュメントの記載ではない |
 | 🔶 部分回答 | 情報はあるが詳細確認が必要 |
 | ⬜ 未回答 | ブログ/ドキュメントでカバーされていない — 要確認 |
+
+**⬜ は「NetApp に送って回答を待っている」状態ではありません。** 未調査であることを指します。
+2026-09-16 時点で、この一覧を NetApp へ送付した記録はありません。相手待ちに変えるには送付が必要です。
 
 ---
 
@@ -72,9 +76,9 @@ EC2 は AMI（EBS バックド）からのみブート可能で、FSx for ONTAP 
 
 | # | 質問 | 優先度 | ステータス |
 |---|------|--------|-----------|
-| Q5 | AWS Transform の FSx for ONTAP 移行は内部で Shift Toolkit / FlexClone / SnapMirror を利用するのか、AWS ネイティブのブロックレプリケーションか? | Critical | ⬜ 未回答 |
+| Q5 | AWS Transform の FSx for ONTAP 移行は内部で Shift Toolkit / FlexClone / SnapMirror を利用するのか、AWS ネイティブのブロックレプリケーションか? | Critical | 🔶 部分回答（実測 2026-09-04） |
 | Q6 | NetApp DII 連携は AWS Transform の discovery（計画）フェーズのみか、移行実行フェーズにも及ぶか? | High | ⬜ 未回答 |
-| Q7 | NetApp として、顧客への Shift Toolkit と AWS Transform の使い分け案内方針は（置き換え / 補完 / 並存）? | High | ⬜ 未回答 |
+| Q7 | NetApp として、顧客への Shift Toolkit と AWS Transform の使い分け案内方針は（置き換え / 補完 / 並存）? | High | ⬜ 未回答（**NetApp にしか答えられない。**実測では出ない） |
 | Q8 | AWS Transform でコンピュート（ルート = EBS）、Shift Toolkit でデータ（FSx for ONTAP）を分担する構成は推奨構成として成立するか? | High | ✅ 確認済み |
 
 ### Q8 回答根拠（公式 Shift Toolkit EC2 手順書 2026-06）
@@ -87,15 +91,32 @@ Shift Toolkit 自身が「OS = EBS（AMI）、データ = FSx for ONTAP（iSCSI 
 
 AWS Transform との分担は別の議論。Shift 単体でこの構成を完結できる。
 
-> **注**: Q5–Q7 は Shift Toolkit の手順書・ブログいずれでも触れられていない。AWS Transform との関係は AWS/NetApp 双方に別途確認が必要。
+> **注**: Q5–Q7 は Shift Toolkit の手順書・ブログいずれでも触れられていない。
+
+**Q5 は 2026-09-04 の実機検証で大半が埋まった**（[GA 検証レポート](atx-fsxn-ga-verification.md) の U4 / 12.3 / 12.4）。
+
+| Q5 の要素 | 実測の結果 |
+|---|---|
+| レプリケーションの方式 | **エージェント型**。ソースにエージェントを導入して実行した |
+| ONTAP 側で起きること | **SNAPSHOT フェーズ = ボリューム Snapshot、LAUNCH フェーズ = FlexClone 作成。**時刻で対応づけた |
+| SnapMirror | 観測した経路には現れない |
+| Shift Toolkit の関与 | **判定できない。**こちらから観測する手段が無く、GA 検証レポートにも言及が無い |
+
+残るのは Shift Toolkit の関与だけで、これは NetApp / AWS への確認が必要。Q6・Q7 は実測では出ない。
 
 ## 3. FSx for ONTAP 移行先としての仕様
 
 | # | 質問 | 優先度 | ステータス |
 |---|------|--------|-----------|
-| Q9 | AWS Transform の FSx for ONTAP 移行先はブロック（iSCSI LUN）のみか、NFS データストア相当も対象か? | High | ⬜ 未回答 |
+| Q9 | AWS Transform の FSx for ONTAP 移行先はブロック（iSCSI LUN）のみか、NFS データストア相当も対象か? | High | 🔬 実測で確定（2026-09-04） |
 | Q10 | 移行後に Snapshot / SnapMirror / FlexClone / Storage Efficiency はそのまま継続利用できるか（系譜・メタデータの引き継ぎ有無）? | Critical | ✅ 確認済み |
 | Q11 | 東京リージョン（ap-northeast-1）で FSx for ONTAP 宛先が利用可能か? | Medium | 🔶 部分回答（**GA 時期は 2026-08-30 に確定。**[What's New](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/)。東京での利用可否は未確認） |
+
+### Q9 回答根拠（自環境の実機検証 2026-09-04）
+
+**ブロック（iSCSI LUN）のみ。** [GA 検証レポート](atx-fsxn-ga-verification.md) の 1 章で、接続は iSCSI、FlexVol 内の LUN として配置され、移行対象はデータボリュームのみ、**ブートボリュームは常に Amazon EBS** であることを実測している。
+
+**NFS データストア相当は ATX の機能ではない。** FSx for ONTAP を VMware のデータストアとして提示するのは **Amazon EVS** 側の別機能で、ATX の GA とは無関係（同レポート 3.2、[文書]）。この 2 つを混同すると設計判断を誤る。
 
 ### Q10 回答根拠（公式 Shift Toolkit EC2 手順書 2026-06）
 
@@ -147,17 +168,23 @@ AWS Transform との分担は別の議論。Shift 単体でこの構成を完結
 
 ---
 
-## 回答サマリー（2026-06-22 時点 — 公式手順書入手後）
+## 回答サマリー（2026-09-16 更新）
 
-| カテゴリ | ✅ 確認済み | 🔶 部分回答 | ⬜ 未回答 |
-|---------|-----------|-----------|---------|
-| 1. OS / ブート方式 | Q1, Q2, Q3, Q4 | — | — |
-| 2. AWS Transform 関係 | Q8 | — | Q5, Q6, Q7 |
-| 3. FSx for ONTAP 仕様 | Q10 | — | Q9, Q11 |
-| 4. 前提・運用 | Q12 | Q13 | Q14 |
-| 5. DR シナリオ | — | — | Q15–Q20 |
+| カテゴリ | ✅ 確認済み | 🔬 実測で確定 | 🔶 部分回答 | ⬜ 未回答 |
+|---------|-----------|------------|-----------|---------|
+| 1. OS / ブート方式 | Q1, Q2, Q3, Q4 | — | — | — |
+| 2. AWS Transform 関係 | Q8 | — | Q5 | Q6, Q7 |
+| 3. FSx for ONTAP 仕様 | Q10 | Q9 | Q11 | — |
+| 4. 前提・運用 | Q12 | — | Q13 | Q14 |
+| 5. DR シナリオ | — | — | — | Q15–Q20 |
 
-**確認済み**: 8/20 問 → **残存未回答（要 NetApp/AWS 確認）**: 9/20 問
+**2026-09-16 時点の内訳は ✅ 7 / 🔬 1 / 🔶 3 / ⬜ 9 の 20 問。** 数を手書きすると古くなるので、引用の前に数え直すこと。
+
+```bash
+grep -oE '^\| Q[0-9]+ .*$' docs/ja/netapp-questions.md | grep -oE '✅|🔬|🔶|⬜' | sort | uniq -c
+```
 
 > 注: Q1–Q4, Q8, Q10, Q12 は公式 Shift Toolkit EC2 手順書（2026-06）で確定。
-> Q5–Q7（AWS Transform 関係）と Q15–Q20（DR）は Shift Toolkit のスコープ外のため別チャネルで確認。
+> Q9 と Q5 の大半は 2026-09-04 の自環境での実機検証で確定した（**公開ドキュメントの記載ではない**）。
+> Q6・Q7 と Q15–Q20 は実測では出ないため、NetApp / AWS への確認が必要。
+> **2026-06-22 版のサマリーは「確認済み 8 / 残存 9」と書いていたが、実数は 7 と 11 だった。**
