@@ -21,8 +21,13 @@
 | Status | Meaning |
 |--------|---------|
 | ✅ Confirmed | Answered via public blog / documentation |
+| 🔬 Measured | **Established by hands-on verification in our own environment**, not stated in public documentation |
 | 🔶 Partial | Information available but further detail needed |
 | ⬜ Unanswered | Not covered in blog / documentation — confirmation required |
+
+**⬜ does not mean "sent to NetApp and awaiting a reply".** It means not yet investigated.
+As of 2026-09-16 there is no record of this list having been sent to NetApp. Turning it into a
+pending request requires sending it.
 
 ---
 
@@ -74,9 +79,9 @@ Confirming the physical constraint that EC2 can only boot from an AMI (EBS-backe
 
 | # | Question | Priority | Status |
 |---|----------|----------|--------|
-| Q5 | Does AWS Transform's FSx for ONTAP migration internally use Shift Toolkit / FlexClone / SnapMirror, or AWS-native block replication? | Critical | ⬜ Unanswered |
+| Q5 | Does AWS Transform's FSx for ONTAP migration internally use Shift Toolkit / FlexClone / SnapMirror, or AWS-native block replication? | Critical | 🔶 Partially answered (measured 2026-09-04) |
 | Q6 | Is the NetApp DII integration limited to AWS Transform's discovery (planning) phase only, or does it extend to the migration execution phase? | High | ⬜ Unanswered |
-| Q7 | What is NetApp's guidance for customers on choosing between Shift Toolkit and AWS Transform (replacement / complement / coexistence)? | High | ⬜ Unanswered |
+| Q7 | What is NetApp's guidance for customers on choosing between Shift Toolkit and AWS Transform (replacement / complement / coexistence)? | High | ⬜ Unanswered (**only NetApp can answer this.** Measurement cannot) |
 | Q8 | Is a configuration where AWS Transform handles compute (root = EBS) and Shift Toolkit handles data (FSx for ONTAP) a supported recommended architecture? | High | ✅ Confirmed |
 
 ### Q8 Answer Basis (Official Shift Toolkit EC2 Procedure, 2026-06)
@@ -89,15 +94,32 @@ Shift Toolkit itself implements "OS = EBS (AMI), data = FSx for ONTAP (iSCSI LUN
 
 Division of labor with AWS Transform is a separate discussion. Shift Toolkit alone can complete this architecture end-to-end.
 
-> **Note**: Q5–Q7 are not addressed in either the Shift Toolkit procedure or blog. The relationship with AWS Transform requires separate confirmation with both AWS and NetApp.
+> **Note**: Q5–Q7 are not addressed in either the Shift Toolkit procedure or blog.
+
+**Most of Q5 was filled in by the hands-on verification of 2026-09-04** (U4 / 12.3 / 12.4 in the [GA verification report](atx-fsxn-ga-verification.md)).
+
+| Element of Q5 | What was measured |
+|---|---|
+| Replication mechanism | **Agent-based.** An agent was installed on the source and the run was executed that way |
+| What happens on the ONTAP side | **SNAPSHOT phase = volume Snapshot, LAUNCH phase = FlexClone creation.** Correlated by timestamps |
+| SnapMirror | Does not appear anywhere in the observed path |
+| Whether Shift Toolkit is involved | **Cannot be determined.** There is no way to observe it from this side, and the GA verification report does not mention it |
+
+What remains is only whether Shift Toolkit is involved, which needs confirmation from NetApp or AWS. Q6 and Q7 cannot be settled by measurement.
 
 ## 3. FSx for ONTAP Specifications as Migration Destination
 
 | # | Question | Priority | Status |
 |---|----------|----------|--------|
-| Q9 | Is AWS Transform's FSx for ONTAP destination block-only (iSCSI LUN), or does it also cover NFS datastore equivalents? | High | ⬜ Unanswered |
+| Q9 | Is AWS Transform's FSx for ONTAP destination block-only (iSCSI LUN), or does it also cover NFS datastore equivalents? | High | 🔬 Measured (2026-09-04) |
 | Q10 | Can Snapshot / SnapMirror / FlexClone / Storage Efficiency continue to be used after migration (lineage and metadata carryover)? | Critical | ✅ Confirmed |
 | Q11 | Is the FSx for ONTAP destination available in the Tokyo region (ap-northeast-1)? | Medium | 🔶 Partially answered (**GA landed on 30 August 2026.** [What's New](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/). Tokyo availability is unverified) |
+
+### Q9 Answer Basis (Hands-on verification in our own environment, 2026-09-04)
+
+**Block only (iSCSI LUN).** Section 1 of the [GA verification report](atx-fsxn-ga-verification.md) measures that the connection is iSCSI, that the LUN sits inside a FlexVol, that only data volumes are migrated, and that **the boot volume is always Amazon EBS**.
+
+**An NFS datastore equivalent is not an ATX capability.** Presenting FSx for ONTAP as a VMware datastore is a separate capability on the **Amazon EVS** side and is unrelated to this GA (section 3.2 of the same report, [Documented]). Conflating the two leads to the wrong design decision.
 
 ### Q10 Answer Basis (Official Shift Toolkit EC2 Procedure, 2026-06)
 
@@ -149,17 +171,23 @@ Confirmed from the procedure's migration flow:
 
 ---
 
-## Answer Summary (as of 2026-06-22 — after obtaining official procedure)
+## Answer Summary (updated 2026-09-16)
 
-| Category | ✅ Confirmed | 🔶 Partial | ⬜ Unanswered |
-|----------|-------------|-----------|--------------|
-| 1. OS / Boot method | Q1, Q2, Q3, Q4 | — | — |
-| 2. AWS Transform relationship | Q8 | — | Q5, Q6, Q7 |
-| 3. FSx for ONTAP specs | Q10 | — | Q9, Q11 |
-| 4. Prerequisites / Operations | Q12 | Q13 | Q14 |
-| 5. DR scenarios | — | — | Q15–Q20 |
+| Category | ✅ Confirmed | 🔬 Measured | 🔶 Partial | ⬜ Unanswered |
+|----------|-------------|------------|-----------|--------------|
+| 1. OS / Boot method | Q1, Q2, Q3, Q4 | — | — | — |
+| 2. AWS Transform relationship | Q8 | — | Q5 | Q6, Q7 |
+| 3. FSx for ONTAP specs | Q10 | Q9 | Q11 | — |
+| 4. Prerequisites / Operations | Q12 | — | Q13 | Q14 |
+| 5. DR scenarios | — | — | — | Q15–Q20 |
 
-**Confirmed**: 8/20 questions → **Remaining unanswered (requires NetApp/AWS confirmation)**: 9/20 questions
+**As of 2026-09-16 the split is ✅ 7 / 🔬 1 / 🔶 3 / ⬜ 9 across 20 questions.** A hand-written count goes stale, so recount before citing it.
+
+```bash
+grep -oE '^\| Q[0-9]+ .*$' docs/en/netapp-questions.md | grep -oE '✅|🔬|🔶|⬜' | sort | uniq -c
+```
 
 > Note: Q1–Q4, Q8, Q10, Q12 are confirmed via the official Shift Toolkit EC2 procedure (2026-06).
-> Q5–Q7 (AWS Transform relationship) and Q15–Q20 (DR) are outside Shift Toolkit scope and require confirmation through separate channels.
+> Q9, and most of Q5, were established by hands-on verification in our own environment on 2026-09-04 (**not stated in public documentation**).
+> Q6, Q7 and Q15–Q20 cannot be settled by measurement and need confirmation from NetApp or AWS.
+> **The 2026-06-22 summary claimed "8 confirmed / 9 remaining"; the actual counts were 7 and 11.**
