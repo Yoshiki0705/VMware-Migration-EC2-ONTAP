@@ -351,6 +351,18 @@ FSx for ONTAP の Multi-AZ は**ファイルシステム 1 つで 99.99%** で�
 | **EBS gp3 2 AZ** | **99.99%** | **$4,095.72** | ボリューム 2 本 $3,993.32 + AZ 間転送 $102.40 |
 | **FSx for ONTAP Multi-AZ** | **99.99%** | **$1,652.72** | **AZ 間の同期複製はスループット容量の料金に含まれ、転送料は $0** |
 
+**Multi-AZ 側の 3 点は AWS の一次情報で確認できます**（2026-09-21 に該当ページを通読）。
+
+| 事実 | 出典の記述 |
+|---|---|
+| standby が active と別 AZ に置かれ、**書き込みが AZ 間で同期複製される** | [Availability, durability, and deployment options](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html): "Any changes written to your file system are synchronously replicated across Availability Zones to the standby" |
+| **AZ 障害が自動フェイルオーバーの発動条件**であり、フェイルオーバーは検知から 60 秒未満、フェイルバックも通常 60 秒未満 | 同ページの Failover process。"An Availability Zone outage occurs (Multi-AZ file systems only)" |
+| AZ 間複製の転送料が**スループット容量の価格に含まれる** | [FSx for ONTAP Pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/): "The cost to transfer data between Availability Zones (AZs) for replication of data is included in the throughput capacity price" |
+
+**この 3 点が、EBS 側で自前構築になる部分に対応します。** 同期複製と自動フェイルオーバーはサービスの性質で、
+構築も運用も利用者側に発生しません。**ただし本検証環境の FSx for ONTAP はいずれも Single-AZ なので、
+この特性はこのプロジェクトでは未実測です**（[GA 検証レポート](atx-fsxn-ga-verification.md) 5.1）。
+
 **同じ 99.99% で比べると、この条件では FSx for ONTAP が 2.48 倍安くなります。**
 1 AZ の EBS（99.9%）と比べたときは gp3 のほうが安かったので、**順位は可用性の前提で
 入れ替わります。**
