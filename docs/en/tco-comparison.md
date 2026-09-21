@@ -362,6 +362,19 @@ replication is yours to run.
 | **EBS gp3, 2 AZs** | **99.99%** | **$4,095.72** | two volumes $3,993.32 + cross-AZ transfer $102.40 |
 | **FSx for ONTAP Multi-AZ** | **99.99%** | **$1,652.72** | **synchronous cross-AZ replication is included in the throughput capacity price; transfer is $0** |
 
+**Three facts on the Multi-AZ side are confirmable from AWS first-party sources** (pages read 2026-09-21).
+
+| Fact | What the source states |
+|---|---|
+| The standby sits in a different AZ from the active, and **writes are synchronously replicated across AZs** | [Availability, durability, and deployment options](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html): "Any changes written to your file system are synchronously replicated across Availability Zones to the standby" |
+| **An AZ outage is a documented trigger for automatic failover**, failover completes in under 60 seconds from detection, and failback usually in under 60 seconds | The Failover process section of the same page: "An Availability Zone outage occurs (Multi-AZ file systems only)" |
+| Cross-AZ replication transfer is **included in the throughput capacity price** | [FSx for ONTAP Pricing](https://aws.amazon.com/fsx/netapp-ontap/pricing/): "The cost to transfer data between Availability Zones (AZs) for replication of data is included in the throughput capacity price" |
+
+**These three are what the EBS side has to build itself.** Synchronous replication and automatic failover are
+properties of the service, so neither construction nor operation lands on the user. **Every FSx for ONTAP file
+system in this verification environment was Single-AZ, so this characteristic is unmeasured here**
+([GA verification report](atx-fsxn-ga-verification.md), 5.1).
+
 **At a matched 99.99%, FSx for ONTAP is 2.48x cheaper under these assumptions.** Against single-AZ
 EBS at 99.9%, gp3 was cheaper — **the ranking turns on the availability assumption.**
 
