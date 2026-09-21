@@ -150,6 +150,19 @@ hot 20%、効率化後 0.30、IOPS は 3 IOPS/GB の範囲内。
 `cost_comparison.py` は第一世代（`MULTI_AZ_1` / `SINGLE_AZ_1`）のみを計算しており、
 **第二世代の逆転点は算出していません。**
 
+**世代と AZ トポロジーは独立した軸です。** 第二世代には Single-AZ 2 と Multi-AZ 2 の両方があり、
+「第二世代だから Single-AZ」ではありません。デプロイタイプは**作成後に変更できません**
+（[AWS](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html)）。
+
+> **ブロックで使う場合、HA ペアを増やす方向には 6 組の条件が先に来ます。** 第二世代 Single-AZ は
+> 1〜12 HA ペアまでスケールしますが、**iSCSI は HA ペアが 6 組以下のファイルシステムでのみ利用でき、
+> NVMe/TCP は第二世代かつ 6 組以下**です（[AWS](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/supported-fsx-clients.html):
+> "The iSCSI protocol is available on all file systems that have 6 or fewer high-availability pairs (HA) pairs.
+> The NVMe/TCP protocol is available on second-generation file systems that have 6 or fewer HA pairs."
+> 2026-09-21 に確認）。**総量の上限（12）とブロックが使える条件（6 以下）は別軸なので、
+> 容量やスループットのために HA ペアを 7 組以上にすると、この移行先の前提である iSCSI を失います。**
+> 本プロジェクトの検証はいずれも 1 HA ペアなので、**この境界は未実測**です。
+
 > **必要なスループット容量を帯域の割り算では決められません。** 姉妹プロジェクトの実測では、
 > 同じ手順・同じテンプレート・同じ交渉結果の 3 環境が 2.64 倍に散っています
 > （[実測](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/a97a4ec/docs/ja/verification/perf-matrix-results.md#f-3-と再現性の実測)）。
