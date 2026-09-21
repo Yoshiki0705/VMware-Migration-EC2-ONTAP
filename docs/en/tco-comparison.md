@@ -155,6 +155,21 @@ whose rate splits by generation; the others are identical (ap-northeast-1, effec
 generation.** This document and `cost_comparison.py` calculate the first generation only
 (`MULTI_AZ_1` / `SINGLE_AZ_1`); **the second-generation crossover is not computed here.**
 
+**Generation and AZ topology are independent axes.** The second generation has both Single-AZ 2 and
+Multi-AZ 2; second-generation does not imply Single-AZ. The deployment type **cannot be changed after
+creation** ([AWS](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html)).
+
+> **For block use, a limit of 6 HA pairs arrives before the scaling ceiling does.** Second-generation
+> Single-AZ scales to 1-12 HA pairs, but **iSCSI is available only on file systems with 6 or fewer HA
+> pairs, and NVMe/TCP only on second-generation file systems with 6 or fewer**
+> ([AWS](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/supported-fsx-clients.html): "The iSCSI
+> protocol is available on all file systems that have 6 or fewer high-availability pairs (HA) pairs.
+> The NVMe/TCP protocol is available on second-generation file systems that have 6 or fewer HA pairs."
+> Read 2026-09-21). **The total ceiling (12) and the condition for block availability (6 or fewer) are
+> different axes, so growing to 7 or more HA pairs for capacity or throughput loses the iSCSI this
+> migration target depends on.** Every file system in this project's verification had a single HA pair,
+> so **this boundary is unmeasured here**.
+
 > **The throughput capacity you need cannot be derived by dividing required bandwidth.** In a
 > sibling project's measurements, three environments running the same procedure, the same
 > template and the same negotiated result spread 2.64x
