@@ -293,6 +293,68 @@ were no longer incurred
 | Billing | On consumption |
 | **Constraint** | **A final backup is taken by default when a volume is deleted, and it keeps billing if left behind** ([teardown](quickstart.md#delete-stack)) |
 
+## What applies first when migrating as block
+
+**Carrying a VMware data volume across as a LUN puts block-specific prerequisites ahead of the
+capabilities' appeal.** This ground is covered by the block-storage verification in the sibling
+[FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook)
+(`ap-northeast-1`, second-generation single HA pair, ONTAP 9.18.1P5 series, 2026-09-05). **All of it
+is the sibling's measurement, not this project's.** This project's GA verification was one end-to-end
+pass of agent-based migration (9.18.1P3D1); the block-specific behaviour below was not measured here.
+**The sibling's block notes exist in Japanese only, so the links below point to the Japanese
+originals.**
+
+### Narrowed before you choose
+
+| Prerequisite | Detail | Source |
+|---|---|---|
+| **Protocol is decided before creation** | Whether iSCSI / NVMe/TCP is available narrows by generation, HA-pair count and OS before you choose. **Generation and HA-pair count cannot be changed after creation** | [protocol-choice-is-bounded-before-you-choose](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/protocol-choice-is-bounded-before-you-choose.md) |
+| **Block objects are outside the AWS API** | The boundary sits between the volume and the LUN. **A template reaches only as far as the volume**; LUNs and igroups are created via the ONTAP CLI / REST API | [block-objects-are-outside-the-aws-api](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/block-objects-are-outside-the-aws-api.md) |
+| **Capacity is counted in three places** | A `space-reserve` LUN consumes volume capacity before a byte is written. When it runs out the LUN **goes read-only** (not a write error) | [capacity-is-counted-in-three-places](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/capacity-is-counted-in-three-places.md) |
+| **NVMe/TCP is thin on the AWS side** | The security-group requirements table omits the NVMe/TCP ports (data 4420 / discovery 8009, from the sibling's measurement). iSCSI's 3260 is listed. **Designing the SG from the table alone leaves NVMe/TCP unable to connect** | [nvme-tcp-is-thin-on-the-aws-side](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/nvme-tcp-is-thin-on-the-aws-side.md) |
+
+**For block use, the 6-HA-pair condition arrives first.** See the
+[generation section of the cost comparison](tco-comparison.md#only-the-throughput-capacity-rate-changes-by-generation).
+
+### Why post-migration availability and recovery differ from file
+
+**This is the substance of "why EC2 + FSx for ONTAP is a safe choice."** Block availability is built
+on a different mechanism from file shares, and designing without knowing it gets it wrong.
+
+| Fact | Detail | Source |
+|---|---|---|
+| **The host multipath is what switches** | The storage presents multiple paths; I/O continuity is on the host. iSCSI path count moves from 2 to 24 with the chosen session count. **Measured failover: iSCSI had no outage; NVMe/TCP had a 423.8-second break** | [paths-are-the-failover-mechanism](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/paths-are-the-failover-mechanism.md) |
+| **Block addresses do not move, even Multi-AZ** | NFS / SMB floating addresses move by route rewrite; iSCSI / NVMe/TCP are fixed addresses inside the VPC CIDR. **They do not trigger the Transit Gateway condition**, and availability is carried by the host multipath | [multi-az-moves-a-route-not-an-address](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/multi-az-moves-a-route-not-an-address.md) |
+| **LUN layout decides recovery granularity** | Snapshot / SnapMirror work per volume. One-LUN-per-volume versus grouping is a **recovery-unit** decision, not performance. Right after migration, all of a server's LUNs land in one volume ([GA verification 12.3](atx-fsxn-ga-verification.md)) | [lun-layout-decides-recovery-granularity](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/lun-layout-decides-recovery-granularity.md) |
+| **Two controls sit outside the igroup** | CHAP (initiator authentication) and portset (restricting which LIFs expose a LUN). **Neither is documented, but both worked under `fsxadmin`** (the sibling's measurement). With igroups alone, spoofing an IQN reaches the LUN | [igroups-are-not-the-only-access-control](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/igroups-are-not-the-only-access-control.md) |
+| **Monitoring has no LUN dimension** | The CloudWatch `AWS/FSx` namespace has neither a LUN nor a protocol dimension. **One-LUN-per-volume makes the volume dimension effectively the LUN dimension.** Per-LUN and p99 come from the ONTAP side | [what-block-monitoring-shows](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/what-block-monitoring-shows.md) |
+
+> **There is a measured migration where crash-consistency is not a problem for a DB on LUNs.** For a
+> PostgreSQL with data and WAL on separate LUNs, a consistency-group Snapshot taken without stopping
+> writes (**a 0.52-second write fence**, same timestamp on both volumes), started from its clone,
+> replayed WAL on its own and **reached consistency in 0.84 seconds**, with every row committed before
+> the fence still present. **What works is not the Snapshot type but that the order of dependent writes
+> is intact**; a fence is required when it spans multiple LUNs
+> ([a-database-on-luns-recovers-without-quiescing](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/a-database-on-luns-recovers-without-quiescing.md),
+> PostgreSQL 16 / a single observation). **This project's [clone consistency](#pattern-a-application-development-clone--test--reiterate)
+> says application consistency is obtained by quiescing; this measurement is the other side — the DB
+> comes up without quiescing.** Do not generalise to other engines.
+
+### Read before you measure — the sibling's block measurement guides
+
+**If you are going to measure performance or protocols yourself, the pitfalls are collected first.**
+
+| Guide | What it holds |
+|---|---|
+| [Block protocol testing guide](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/en/reference/block-protocol-testing-guide.md) | That "single-client 5 Gbps (625 MBps) / required bandwidth = session count" does not hold, that the queue count is not granted on request (36 to 4), the pre-billing check for whether ANA is usable, and the six-hour cooldown after a provisioned-IOPS decrease |
+| [ONTAP version matrix](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/en/reference/block-protocol-ontap-version-matrix.md) | Which measurement was taken on which ONTAP version. **The primary environment is 9.18.1P3D1 — the same version as this project's GA verification** |
+| [AWS feedback status](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/en/reference/block-protocol-aws-feedback-status.md) | Block-origin items already filed with AWS. Read alongside this project's [feedback to AWS](atx-fsxn-feedback-to-aws.md) for the full picture |
+
+> **This is the source for the six-hour cooldown.** The provisioned-IOPS cooldown mentioned in the
+> [cost comparison](tco-comparison.md#first-generation-file-systems-cannot-decrease-ssd) is measured by
+> the testing guide above (decrease direction only; increases unconstrained; the update itself sits in
+> `UPDATED_OPTIMIZING` for about 18 minutes).
+
 ## Using this when selecting and designing
 
 **Work through it in this order.**
@@ -300,7 +362,7 @@ were no longer incurred
 | Step | Question | What it settles |
 |---|---|---|
 | 1 | How many environments (dev, test, DR, validation) | **Whether FlexClone applies. More environments favour FSx** |
-| 2 | Carry block through, or replace it with file | Whether tiering and efficiency apply. See [why tiering should not be assumed for block storage](tco-comparison.md#why-tiering-should-not-be-assumed-for-block-storage) |
+| 2 | Carry block through, or replace it with file | Whether tiering and efficiency apply ([why tiering should not be assumed for block storage](tco-comparison.md#why-tiering-should-not-be-assumed-for-block-storage)). If carrying block through, see [what applies first](#what-applies-first-when-migrating-as-block) |
 | 3 | The RPO and RTO requirement | Whether SnapMirror suffices (**RPO 0 is not available**), and what to build on the EBS side |
 | 4 | The availability commitment | See [comparing at matched availability](tco-comparison.md#comparing-at-matched-availability-9999) |
 | 5 | Immutability and audit requirements | Whether SnapLock is needed. EBS has no equivalent |
