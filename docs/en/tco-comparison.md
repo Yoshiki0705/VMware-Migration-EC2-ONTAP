@@ -365,6 +365,36 @@ replication is yours to run.
 **At a matched 99.99%, FSx for ONTAP is 2.48x cheaper under these assumptions.** Against single-AZ
 EBS at 99.9%, gp3 was cheaper — **the ranking turns on the availability assumption.**
 
+### Matched availability does not settle it — capacity flips the ranking back
+
+**The 20 TiB above is one point. Lower the capacity and 2-AZ EBS becomes cheaper even at a matched
+99.99%.** The crossover moves with the required throughput capacity, so **it cannot be quoted as a
+constant.**
+
+| Required throughput capacity / IOPS | Crossover (logical) | At logical 100 GB |
+|---|---|---|
+| 512 MB/s / 5,000 | 8,523 GB (8.3 TiB) | 2-AZ EBS $80.86 vs FSx for ONTAP $1,159.49 (**14.3x**) |
+| 256 MB/s / 3,000 | 4,545 GB (4.4 TiB) | $32.28 vs $694.02 (21.5x) |
+| 128 MB/s / 3,000 | 2,556 GB (2.5 TiB) | $19.98 vs $500.61 (25.1x) |
+
+**The crossover sits between 2.5 and 8.3 TiB.** Below it, the FSx for ONTAP minimum of 1,024 GiB of
+SSD and the throughput capacity floor dominate.
+
+**Below the crossover, what decides the choice is not the storage price.** The 2-AZ EBS figures above
+are storage only, and the [four items that are not counted](#what-the-2-az-ebs-figure-does-not-count)
+do not scale with capacity. Building and operating replication and failover yourself for a single EC2
+holding tens of GiB stops being a storage-versus-storage comparison. **"A dedicated data volume for a
+single instance, therefore EBS" holds only when there is no requirement to survive the loss of an
+AZ.**
+
+Reproduce:
+
+```bash
+python3 scripts/cost_comparison.py --data-size 100   --deployment MULTI_AZ_1 --workload vm
+python3 scripts/cost_comparison.py --data-size 8523  --deployment MULTI_AZ_1 --workload vm
+python3 scripts/cost_comparison.py --data-size 2556  --deployment MULTI_AZ_1 --workload vm --throughput 128 --iops 3000
+```
+
 ### What the 2-AZ EBS figure does not count
 
 **These are absent from the $4,095.72.** Including them widens the gap.
