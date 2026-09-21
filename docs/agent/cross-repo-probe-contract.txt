@@ -229,7 +229,34 @@
 # still exists. What changed is on this side: the absence it carried has narrowed from "the cause is
 # unconfirmed" to "what decides which of the two tiers is unconfirmed", and
 # cross-repo-block-performance.md now says that instead.
+#
 # ---------------------------------------------------------------------------------------------------
+# THE BLOCK-STORAGE NOTES, cited 2026-09-21 in ontap-capability-selection-factors.md
+#
+# ontap-capability-selection-factors.md gained a section, "ブロックで移行するときに先に効く前提", that
+# maps the playbook's block-storage domain into the migration decision. Six of those notes carry a
+# measured fact this project has no equivalent for, and each is restated here, so each needs a probe.
+#
+# **They exist in Japanese only.** The playbook has no `docs/en/domains/block-storage/notes/`, so both
+# this repository's JA and EN documents link the JA originals. When the sibling publishes the EN notes,
+# the EN links move and these probes stay on the JA files that carry the measurement.
+#
+# All six were single-occurrence at the pinned read except the capacity note, where the read-only
+# consequence occurs more than once; the observation registered instead
+# (`1 バイトも書いていない状態で...20.078 GiB を消費しました`) is unique and is the sentence this
+# repository actually restates.
+#
+# `crash-consistent は、DB が...` was NOT the string chosen for the DB-recovery note: it is the reading,
+# and the reading is what this repository already stated from AWS/NetApp docs before the sibling
+# measured it. The registered string is the measured claim -- that the DB comes up because the write
+# order is intact -- which is theirs to withdraw.
+# ---------------------------------------------------------------------------------------------------
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/domains/block-storage/notes/a-database-on-luns-recovers-without-quiescing.md	retraction	DB が自分でクラッシュから立ち上がれる限りにおいて DB に使えます
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/domains/block-storage/notes/capacity-is-counted-in-three-places.md	retraction	1 バイトも書いていない状態でボリュームの 95 GiB から 20.078 GiB を消費しました
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/domains/block-storage/notes/igroups-are-not-the-only-access-control.md	retraction	どちらも FSx for ONTAP の公式ドキュメントで見つけられませんでした
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/domains/block-storage/notes/multi-az-moves-a-route-not-an-address.md	retraction	ブロックのアドレスは動かない側です
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/domains/block-storage/notes/nvme-tcp-is-thin-on-the-aws-side.md	retraction	データが TCP 4420、ディスカバリが TCP 8009
+FSx-for-ONTAP-Adoption-Playbook	docs/ja/domains/block-storage/notes/paths-are-the-failover-mechanism.md	retraction	iSCSI は無停止、NVMe/TCP は 423.8 秒の断
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	FlexClone が省くのは本番への影響です
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	アプリケーション側の保証は受けていません
 FSx-for-ONTAP-Adoption-Playbook	docs/ja/reference/comparison/block-to-file-routes.md	retraction	ホストを経由するのでコピーが 1 本発生します

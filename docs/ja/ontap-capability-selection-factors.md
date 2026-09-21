@@ -295,6 +295,64 @@ SnapMirror は親ボリュームへの複製を続けます。**検証のため�
 | 課金 | 消費量課金 |
 | **制約** | **ボリューム削除時に最終バックアップが既定で取られ、残ると課金が続きます**（[撤去手順](quickstart.md#スタック削除)） |
 
+## ブロックで移行するときに先に効く前提
+
+**VMware のデータ領域を LUN のまま EC2 へ移すと、機能の魅力の前に、ブロック固有の前提が
+いくつも先に来ます。** ここは姉妹プロジェクト [FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook)
+のブロックストレージ検証（`ap-northeast-1`、第 2 世代 1 HA ペア、ONTAP 9.18.1P5 系、2026-09-05）が
+埋めています。**いずれも姉妹側の実測で、このプロジェクトの実測ではありません。**
+本プロジェクトの GA 検証はエージェント型移行の 1 回の通し（9.18.1P3D1）で、下記のブロック固有の
+挙動は測っていません。
+
+### 選ぶ前に狭まっていること
+
+| 前提 | 内容 | 出典 |
+|---|---|---|
+| **プロトコルは作成前に決まる** | iSCSI / NVMe/TCP の可否は、世代・HA ペア数・OS で選ぶ前に狭まる。**世代と HA ペア数は作成後に変えられない** | [protocol-choice-is-bounded-before-you-choose](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/protocol-choice-is-bounded-before-you-choose.md) |
+| **ブロックは AWS の API の外側** | 境界はボリュームと LUN の間。**テンプレートが届くのはボリュームまで**で、LUN・igroup は ONTAP CLI / REST API で作る | [block-objects-are-outside-the-aws-api](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/block-objects-are-outside-the-aws-api.md) |
+| **容量は 3 か所で差し引かれる** | `space-reserve` 有効の LUN は 1 バイトも書かずにボリューム容量を消費する。足りなくなると LUN は **read-only に落ちる**（書き込みエラーではない） | [capacity-is-counted-in-three-places](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/capacity-is-counted-in-three-places.md) |
+| **NVMe/TCP は AWS 側の面から抜けている** | セキュリティグループ要件表に NVMe/TCP のポートが無い（データ 4420 / ディスカバリ 8009 は姉妹側の実測）。iSCSI の 3260 は載っている。**要件表だけで SG を設計すると NVMe/TCP は通らない** | [nvme-tcp-is-thin-on-the-aws-side](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/nvme-tcp-is-thin-on-the-aws-side.md) |
+
+**ブロックで使うと HA ペアは 6 組の条件が先に来ます。** 詳細は
+[費用の比較の世代の節](tco-comparison.md#世代で変わるのはスループット容量の単価のみ)。
+
+### 移行後の可用性と復旧が、ファイル共有と違う理由
+
+**ここが「EC2 + FSx for ONTAP を選ぶ安心材料」の中身です。** ブロックの可用性はファイル共有と
+別の仕組みで成り立っていて、知らずに設計すると外します。
+
+| 事実 | 内容 | 出典 |
+|---|---|---|
+| **切り替えるのはホストの multipath** | ストレージは複数パスを見せるところまでで、I/O 継続はホスト側。iSCSI のパス数は選んだセッション数で 2〜24 本に動く。**実測でフェイルオーバー時、iSCSI は無停止・NVMe/TCP は 423.8 秒の断** | [paths-are-the-failover-mechanism](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/paths-are-the-failover-mechanism.md) |
+| **ブロックのアドレスは Multi-AZ でも動かない** | NFS / SMB は floating アドレスがルート書き換えで移るが、iSCSI / NVMe/TCP は VPC CIDR 内の固定アドレス。**Transit Gateway を要求する条件に当たらず**、可用性はホストの multipath が担う | [multi-az-moves-a-route-not-an-address](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/multi-az-moves-a-route-not-an-address.md) |
+| **LUN のレイアウトが復旧の粒度を決める** | Snapshot / SnapMirror はボリューム単位。1 ボリューム 1 LUN かまとめるかは性能ではなく**復旧単位**の判断。移行直後は 1 サーバーの全 LUN が 1 ボリュームに載る（[GA 検証 12.3](atx-fsxn-ga-verification.md)） | [lun-layout-decides-recovery-granularity](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/lun-layout-decides-recovery-granularity.md) |
+| **igroup の外に 2 つの制御がある** | CHAP（イニシエータ認証）と portset（LUN を見せる LIF の制限）。**どちらも公式ドキュメントに記載が見つからないが、`fsxadmin` で操作できた**（姉妹側の実測）。igroup だけだと IQN を騙れば届く | [igroups-are-not-the-only-access-control](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/igroups-are-not-the-only-access-control.md) |
+| **監視に LUN 次元は無い** | CloudWatch の `AWS/FSx` に LUN 次元もプロトコル次元も無い。**1 ボリューム 1 LUN ならボリューム次元が実質 LUN 次元**になる。LUN 単位や p99 は ONTAP 側に聞く | [what-block-monitoring-shows](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/what-block-monitoring-shows.md) |
+
+> **DB を LUN に載せた移行で、crash-consistent が問題にならない実測があります。** データと WAL を
+> 別 LUN に分けた PostgreSQL に対し、書き込みを止めずに consistency group の Snapshot を取り
+> （**write fence 0.52 秒**、2 ボリュームに同一時刻）、そのクローンから起動したところ、DB は自分で
+> WAL を再生して **0.84 秒で整合**し、fence 直前のコミット行はすべて残っていました。**効いているのは
+> Snapshot の種類ではなく、依存する書き込みの順序が壊れていないこと**で、複数 LUN にまたがるなら
+> fence が要ります（[a-database-on-luns-recovers-without-quiescing](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/domains/block-storage/notes/a-database-on-luns-recovers-without-quiescing.md)、
+> PostgreSQL 16 / 1 回の観測）。**このプロジェクトの [クローンの整合性](#パターン-a-アプリケーション開発clone--test--reiterate)は
+> 「静止させればアプリ整合性が取れる」と書いていますが、この実測は「静止させなくても DB が
+> 立ち上がる」側の具体です。** 他のエンジンには一般化できません。
+
+### 測る前に読む — 姉妹プロジェクトのブロック測定ガイド
+
+**性能やプロトコルを自分で測るなら、測り方の落とし穴が先にまとまっています。**
+
+| ガイド | 何が書いてあるか |
+|---|---|
+| [ブロックプロトコルの測定ガイド](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/block-protocol-testing-guide.md) | 「1 クライアント 5 Gbps（625 MBps）÷ 必要帯域 = セッション数」が成立しないこと、キュー数は要求しても通らないこと（36 → 4）、ANA が使えるかの課金前チェック、プロビジョンド IOPS を下げたときの 6 時間クールダウン |
+| [ONTAP バージョン対応表](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/block-protocol-ontap-version-matrix.md) | どの実測がどの ONTAP 版で測られたか。**主要測定環境が 9.18.1P3D1 で、本プロジェクトの GA 検証と同じ版** |
+| [AWS フィードバック状況](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/block-protocol-aws-feedback-status.md) | ブロック起点で AWS へ提出済みの指摘。本プロジェクトの [AWS へのフィードバック](atx-fsxn-feedback-to-aws.md) と並べると全体像になる |
+
+> **6 時間クールダウンの出典はこれです。** [費用の比較](tco-comparison.md#第一世代における-ssd-減設の不可)で
+> 触れているプロビジョンド IOPS 変更後のクールダウンは、上の測定ガイドが実測しています
+> （下げる方向のみ制約、上げる方向は無制約、更新完了自体も `UPDATED_OPTIMIZING` に約 18 分）。
+
 ## 選定と設計での使い方
 
 **次の順で判断してください。**
@@ -302,7 +360,7 @@ SnapMirror は親ボリュームへの複製を続けます。**検証のため�
 | 段階 | 問い | 決まること |
 |---|---|---|
 | 1 | 面をいくつ作るか（開発 / テスト / DR / 検証） | **FlexClone が効くかどうか。面が多いほど FSx 側に寄ります** |
-| 2 | ブロックのまま持っていくか、ファイルに置き換えるか | 階層化と効率化が効くかどうか。[階層化前提の不成立](tco-comparison.md#ブロックストレージにおける階層化前提の不成立)を参照 |
+| 2 | ブロックのまま持っていくか、ファイルに置き換えるか | 階層化と効率化が効くかどうか（[階層化前提の不成立](tco-comparison.md#ブロックストレージにおける階層化前提の不成立)）。ブロックのままなら[先に効く前提](#ブロックで移行するときに先に効く前提)を参照 |
 | 3 | RPO / RTO の要件 | SnapMirror で足りるか（**RPO 0 は取れません**）、EBS 側で何を作るか |
 | 4 | 可用性のコミットメント | [可用性を揃えた比較](tco-comparison.md#可用性を揃えた比較9999) を参照 |
 | 5 | 改変防止・監査の要件 | SnapLock が要るか。EBS に対応手段はありません |

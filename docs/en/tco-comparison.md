@@ -238,8 +238,10 @@ second-generation only, in steps of at least 9%, and utilization must stay under
 ([source](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/storage-capacity-and-IOPS.html)).
 
 **So realising the efficiency saving means provisioning less from the start.** Over-provisioning
-and trimming later does not work on first-generation. There is also a six-hour cooldown between
-capacity and throughput changes.
+and trimming later does not work on first-generation. **After a provisioned-IOPS decrease there is a
+six-hour cooldown, and only the decrease direction is constrained** (measured by a sibling project;
+increases are unconstrained, and the update itself sits in `UPDATED_OPTIMIZING` for about 18 minutes.
+[Block protocol testing guide](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/en/reference/block-protocol-testing-guide.md)).
 
 ### The availability assumptions do not match
 

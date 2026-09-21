@@ -228,8 +228,9 @@ AWS が公表しているワークロード別の削減率（圧縮 + 重複排�
 （[出典](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/storage-capacity-and-IOPS.html)）。
 
 **つまり、効率化を請求に反映させるには最初から少なく確保する必要があります。** 多めに確保して
-後から削る運用は第一世代では成立しません。容量とスループットの変更後には 6 時間の
-クールダウンもあります。
+後から削る運用は第一世代では成立しません。**プロビジョンド IOPS を下げた後には 6 時間の
+クールダウンがあり、下げる方向のみ制約されます**（姉妹プロジェクトの実測。上げる方向は無制約、
+更新完了自体も `UPDATED_OPTIMIZING` に約 18 分。[ブロックプロトコルの測定ガイド](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/block-protocol-testing-guide.md)）。
 
 ### 可用性の前提の不一致
 
