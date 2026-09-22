@@ -253,3 +253,4 @@ Pattern D: Mixed methods (different methods per VM characteristics)
 - [VM Import/Export Procedure](./vm-import-procedure.md)
 - [FSx for ONTAP iSCSI Setup Guide](./fsxn-iscsi-setup.md)
 - [Research Summary](./research-summary.md)
+- Patterns for using FSx for ONTAP as a data store on container targets (ECS / EKS) live in a separate repository, [FSx-for-ONTAP-Container-Datastore-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-Container-Datastore-Patterns). This repository covers VMware → EC2 rehost migration.
