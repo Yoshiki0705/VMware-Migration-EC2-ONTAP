@@ -1,0 +1,45 @@
+{
+  "schema": "knowledge-quality/repository-overrides/v1",
+  "overrides": [
+    {
+      "category": "scan-root",
+      "value": "docs",
+      "reason": "Bilingual documentation tree (docs/ja primary, docs/en translation); the primary surface for the naming, neutrality, and public-output audit in this repository."
+    },
+    {
+      "category": "scan-root",
+      "value": "templates",
+      "reason": "CloudFormation templates carry service names in comments and descriptions, so they are in scope for the naming rule."
+    },
+    {
+      "category": "scan-root",
+      "value": "scripts",
+      "reason": "Helper scripts; comments and messages are subject to the naming and neutrality rules."
+    },
+    {
+      "category": "scan-root",
+      "value": "tools",
+      "reason": "Repository tooling and its comments and messages; in scope for naming and neutrality."
+    },
+    {
+      "category": "scan-root",
+      "value": "verification",
+      "reason": "Verification documentation written as prose; in scope for naming and public-output safety."
+    },
+    {
+      "category": "exclusion",
+      "value": ".private",
+      "reason": "Gitignored. Holds review provenance and any support-case references that must never reach public output; excluded from the public-facing audit surface by design."
+    },
+    {
+      "category": "exclusion",
+      "value": "params",
+      "reason": "Parameter and configuration data files, not human-facing narrative prose; outside the naming/neutrality audit surface."
+    },
+    {
+      "category": "localization-tier",
+      "value": "bilingual-ja-primary",
+      "reason": "Japanese under docs/ja is authoritative; docs/en is the translation and must keep matching section structure. Same tier model as the Hub, declared here as this repository's own configuration rather than copied rule text."
+    }
+  ]
+}
