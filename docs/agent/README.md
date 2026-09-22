@@ -15,3 +15,8 @@ knowledge body may live there.
 Global rules (naming, vendor neutrality, writing style, public-output safety)
 come from user-level Kiro steering and apply to every repository. The documents
 here cover only what is specific to this one.
+
+Container data-store patterns (using FSx for ONTAP from ECS / EKS, including
+AWS Transform containerization workloads) live in a separate repository,
+[FSx-for-ONTAP-Container-Datastore-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-Container-Datastore-Patterns).
+This repository covers the VMware → EC2 rehost migration path.
