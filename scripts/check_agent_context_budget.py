@@ -24,6 +24,7 @@ Run via `make context-budget` or `make drift`.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -65,6 +66,11 @@ class Report:
 
 def tracked_files(root: Path) -> set[str]:
     """Paths git tracks. Empty set when git is unavailable, which skips the check."""
+    # Strip inherited git-location variables. Under a pre-commit hook git exports
+    # GIT_DIR / GIT_INDEX_FILE, which override cwd: "ls-files" would then list the
+    # hook's repository instead of `root`, and an untracked target in `root` would
+    # pass silently.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     try:
         result = subprocess.run(  # noqa: S603 - fixed argv, no shell
             ["git", "ls-files"],
@@ -72,6 +78,7 @@ def tracked_files(root: Path) -> set[str]:
             capture_output=True,
             text=True,
             check=True,
+            env=env,
         )
     except (OSError, subprocess.CalledProcessError):
         return set()
