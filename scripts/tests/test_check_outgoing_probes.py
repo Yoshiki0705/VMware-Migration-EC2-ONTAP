@@ -11,6 +11,7 @@ Each test is written so that reverting the fix makes it fail for the stated reas
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -26,7 +27,13 @@ CLAIM = "上限は 1 フローの容量ではない"
 
 
 def git(cwd: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+    # Strip inherited git-location variables. When this test runs from inside a
+    # pre-commit hook, git exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE for
+    # the commit in progress; without clearing them the throwaway repositories
+    # below operate on the parent repository instead — committing 'seed' onto the
+    # real branch and corrupting its index and config.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=env)
 
 
 def write(root: Path, path: str, body: str) -> None:
