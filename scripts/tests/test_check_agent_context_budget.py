@@ -11,6 +11,7 @@ passing is not known to work.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -39,8 +40,13 @@ def make_repo(
         steering.mkdir(parents=True)
         (steering / "fixture.md").write_text(loader_body, encoding="utf-8")
     if git_init:
-        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)  # noqa: S603,S607
-        subprocess.run(["git", "add", "AGENTS.md"], cwd=tmp_path, check=True)  # noqa: S603,S607
+        # Strip inherited git-location variables. Under a pre-commit hook git
+        # exports GIT_DIR / GIT_INDEX_FILE; without clearing them this "git add
+        # AGENTS.md" stages the fixture's AGENTS.md into the real repository's
+        # index instead of the throwaway one, corrupting the pending commit.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True, env=env)  # noqa: S603,S607
+        subprocess.run(["git", "add", "AGENTS.md"], cwd=tmp_path, check=True, env=env)  # noqa: S603,S607
     return tmp_path
 
 

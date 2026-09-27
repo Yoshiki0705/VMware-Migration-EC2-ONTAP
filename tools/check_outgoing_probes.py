@@ -133,6 +133,10 @@ PUBLISHED_REF = "origin/main"
 
 
 def git(checkout: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    # Strip inherited git-location variables. Under a pre-commit hook git exports
+    # GIT_DIR / GIT_INDEX_FILE, which override cwd: every read would then answer
+    # for the hook's repository instead of the sibling `checkout`.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     try:
         return subprocess.run(
             ["git", *args],
@@ -140,6 +144,7 @@ def git(checkout: Path, *args: str) -> subprocess.CompletedProcess[str]:
             capture_output=True,
             text=True,
             check=False,
+            env=env,
         )
     except OSError:
         # No git on PATH. Reported as an inability to reach the ref, not as a missing file.
