@@ -156,6 +156,28 @@ ICONS = {
     "disk": "Resource-Icons_{d}/Res_General-Icons/Res_48_{v}/Res_Disk_48_{v}.svg",
 }
 
+# Icons that are NOT in the AWS Architecture Icons package. Kept in-repo under
+# docs/_assets/icons/ (committed, unlike the AWS package, which is licensed for use in a
+# diagram and not for redistribution). Each entry is (repo-relative path, MIME). A mark is
+# the correct attribution for its own product -- not a stand-in for a missing AWS icon,
+# which the standard forbids.
+#
+# Add a mark here only when its owner's terms allow it. The NetApp ONTAP mark is used by a
+# NetApp employee, which NetApp marketing confirmed. The Nutanix logo is NOT here: Nutanix's
+# Trademark Usage Guidelines forbid use of its corporate logo marks by third parties
+# without express written permission
+# (https://www.nutanix.com/legal/trademark-usage-guidelines), so Nutanix appears as a text
+# box with its word mark spelled in full.
+# The NetApp mark is a PNG, but draw.io's CLI export renders a broken-image placeholder
+# for an embedded `data:image/png;base64,` URI (the same class of export quirk the module
+# docstring records for SVG). Wrapping the PNG bytes inside an SVG `<image>` and embedding
+# that via the comma-only `data:image/svg+xml,` form — the form every AWS icon uses — is
+# the one that survives export. `docs/_assets/icons/netapp-ontap.svg` is that wrapper;
+# `netapp-ontap.png` stays as the original source.
+CUSTOM_ICONS = {
+    "netapp_ontap": ("docs/_assets/icons/netapp-ontap.svg", "image/svg+xml"),
+}
+
 # Native sizes. Rescaling is what the AWS icon guidelines forbid, so the size follows the
 # asset: 80 for an architecture (service) icon, 48 for a resource icon.
 ICON_SIZE = {
@@ -185,6 +207,8 @@ ICON_SIZE = {
     "nlb": 48,
     "ebs_volume": 48,
     "disk": 48,
+    # NetApp ONTAP mark is a square tile, so it sits on the 80px service grid.
+    "netapp_ontap": 80,
 }
 
 # --- palettes ----------------------------------------------------------------------------
@@ -423,7 +447,7 @@ LABELS: dict[str, dict[str, str]] = {
         "en": "Amazon Elastic VMware Service\n(stay on VMware)",
     },
     # Nutanix はサードパーティなので箱。アイコンは AWS のサービスにだけ使う。
-    "journey_nc2": {"ja": "NC2 + ONTAP\n（Nutanix）", "en": "NC2 + ONTAP\n(Nutanix)"},
+    "journey_nc2": {"ja": "NC2\n（Nutanix）", "en": "NC2\n(Nutanix)"},
     "journey_rosa": {
         "ja": "Red Hat OpenShift\nService on AWS\n（+ FSx for ONTAP）",
         "en": "Red Hat OpenShift\nService on AWS\n(+ FSx for ONTAP)",
@@ -651,10 +675,17 @@ LABELS: dict[str, dict[str, str]] = {
         "ja": "Red Hat OpenShift\nService on AWS",
         "en": "Red Hat OpenShift\nService on AWS",
     },
-    # サードパーティ製品なので箱。AWS / Amazon の接頭辞の規則は AWS のサービスにだけ効く。
+    # サードパーティ製品なので箱。ロゴは Nutanix の商標ガイドラインで第三者の使用に書面の
+    # 許可が要るため使わない（CUSTOM_ICONS のコメント参照）。文字の商標は略さず書く。
     "pw_nc2": {
         "ja": "Nutanix Cloud Clusters\non AWS",
         "en": "Nutanix Cloud Clusters\non AWS",
+    },
+    # NetApp ONTAP は AWS パッケージ外の NetApp 提供マーク。AWS サービス同様アイコン下に名前。
+    "pw_netapp_ontap": {"ja": "NetApp ONTAP", "en": "NetApp ONTAP"},
+    "pw_fsx4": {
+        "ja": "Amazon FSx for NetApp ONTAP",
+        "en": "Amazon FSx for NetApp ONTAP",
     },
     "e_pw_iscsi": {"ja": "iSCSI", "en": "iSCSI"},
     "e_pw_nfs": {"ja": "NFS / SMB", "en": "NFS / SMB"},
@@ -1499,9 +1530,9 @@ def _vmware_pathways() -> Diagram:
             Group("pw5", "pw5", 25, 1170, 890, 210, gr_icon=None, kind="vpc", dashed=True),
         ),
         boxes=(
-            # Nutanix はサードパーティなので箱。AWS / Amazon の接頭辞の規則は AWS の
-            # サービスにだけ効く。
-            Box("pw_nc2", "pw_nc2", 380, 1235, 280, 62),
+            # Nutanix はサードパーティなので箱。ロゴは使わない（CUSTOM_ICONS のコメント参照）。
+            # 左の Amazon FSx for NetApp ONTAP のラベル（約 360-580）に接しないよう右端へ寄せる。
+            Box("pw_nc2", "pw_nc2", 640, 1234, 250, 62),
         ),
         nodes=(
             Node("pw_ec2", "ec2", "pw_ec2", *centred("ec2", 150, 125)),
@@ -1516,8 +1547,18 @@ def _vmware_pathways() -> Diagram:
             Node("pw_fsx2", "fsx_ontap", "pw_fsx2", *centred("fsx_ontap", 580, 520)),
             Node("pw_evs", "evs", "pw_evs", *centred("evs", 160, 765)),
             Node("pw_fsx3", "fsx_ontap", "pw_fsx3", *centred("fsx_ontap", 470, 765)),
+            # 4 段目（Outposts = オンプレミスでの AWS 実行）。データ層として NetApp ONTAP。
+            # AWS サービス同様、アイコンの下に「NetApp ONTAP」と名前を出す。
             Node("pw_outposts", "outposts", "pw_outposts", *centred("outposts", 160, 1015)),
-            Node("pw_rosa", "rosa", "pw_rosa", *centred("rosa", 170, 1265)),
+            Node(
+                "pw_netapp", "netapp_ontap", "pw_netapp_ontap", *centred("netapp_ontap", 470, 1015)
+            ),
+            # 5 段目（サードパーティハイパーバイザー）。ROSA と NC2 はコンピュートの選択肢。
+            # FSx for ONTAP はこの段のデータ層として置く。**NC2 とは結線しない**（NC2 +
+            # FSx for ONTAP の統合は公開情報で未確約）。ROSA は Trident 経由で FSx for ONTAP を
+            # 使えるため、段のデータ層として妥当。
+            Node("pw_rosa", "rosa", "pw_rosa", *centred("rosa", 160, 1265)),
+            Node("pw_fsx4", "fsx_ontap", "pw_fsx4", *centred("fsx_ontap", 470, 1265)),
         ),
         edges=(
             Edge(
@@ -1828,6 +1869,17 @@ def data_uris(package: Path) -> dict[tuple[str, str], str]:
                 raise SystemExit(f"build_diagrams: {resolved} missing from {package}")
             encoded = base64.b64encode(path.read_bytes()).decode("ascii")
             uris[(key, theme)] = f"data:image/svg+xml,{encoded}"
+        # Custom vendor marks live in the repo, not the AWS package. Same bytes per theme.
+        for key, (relative, mime) in CUSTOM_ICONS.items():
+            path = ROOT / relative
+            if not path.is_file():
+                raise SystemExit(f"build_diagrams: custom icon {relative} missing")
+            encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+            # SVG needs the comma-only form; a raster (PNG) needs the `;base64,` form.
+            if mime == "image/svg+xml":
+                uris[(key, theme)] = f"data:{mime},{encoded}"
+            else:
+                uris[(key, theme)] = f"data:{mime};base64,{encoded}"
     return uris
 
 
