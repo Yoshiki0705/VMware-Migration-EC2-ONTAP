@@ -254,3 +254,4 @@ EC2 起動:                       15.1秒
 - [FSx for ONTAP iSCSI 設定ガイド](./fsxn-iscsi-setup.md)
 - [調査レポート](./research.md)
 - コンテナ移行先(ECS / EKS)で FSx for ONTAP をデータストアに使うパターンは別リポジトリ [FSx-for-ONTAP-Container-Datastore-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-Container-Datastore-Patterns) にあります。本リポジトリは VMware → EC2 リホスト移行が対象です。
+- FSx for ONTAP の設計・構築・運用知見の Hub は [FSx-for-ONTAP-Adoption-Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) にあります。移行はモダナイゼーションの入口で、コンテナ化・サーバーレス化・分析・DR へと続く全体像は Hub 側で束ねています。
