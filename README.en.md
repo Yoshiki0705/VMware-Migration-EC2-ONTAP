@@ -21,6 +21,15 @@
 | Set up PoC environment | [Quick Start](docs/en/quickstart.md) | 15 min |
 | Configure iSCSI LUNs | [iSCSI Setup](docs/en/fsxn-iscsi-setup.md) | 15 min |
 
+**Articles** (series "The Data Foundation for AWS Modernization")
+
+| Part | English | Japanese |
+|:-----|:--------|:---------|
+| Part 1 | [Designing AWS Modernization with VMware Migration as the Entry Point — Why FSx for ONTAP as the Data Foundation](https://dev.to/aws-builders/designing-aws-modernization-with-vmware-migration-as-the-entry-point-why-fsx-for-ontap-as-the-3k24) | [hatenablog](https://hakobiya.hatenablog.com/entry/fsxn-vmware-migration-options-ec2) |
+| Part 2 | [AWS Transform Now Supports Block Storage Migration to FSx for ONTAP — Benefits and Pitfalls from a Hands-On EC2 Test](https://dev.to/aws-builders/aws-transform-now-supports-block-storage-migration-to-fsx-for-ontap-benefits-and-pitfalls-from-a-1hhe) | [hatenablog](https://hakobiya.hatenablog.com/entry/fsxn-aws-transform-mgn-migration-target) |
+
+The verification behind Part 2 is detailed in the [AWS Transform FSx for ONTAP Support GA — Verification Report](docs/en/atx-fsxn-ga-verification.md). How to read the stages beyond migration (containerization, serverless, DR, operations) is laid out in the hub's [modernization journey map](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/reference/modernization-journey-map.md).
+
 > **The parts that a migration runbook does not carry** — where the rollback window closes, the capacity peak at Finalize, ACL preservation, and how LUN placement decides recovery granularity — are in the sibling repository [FSx for ONTAP Adoption Playbook — 03 Migrate](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/playbooks/03-migrate/README.md). Referenced rather than copied here.
 
 <details><summary>📂 All Documents</summary>
