@@ -56,7 +56,11 @@ if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh &> /dev/null; then
   export GITHUB_TOKEN
 fi
 
-if ! make gates; then
+# git exports GIT_DIR / GIT_INDEX_FILE to hooks, and they override cwd in every git call
+# the gates make. Measured: probe tests building throwaway repos committed 'seed' onto the
+# checked-out branch, staged a fixture AGENTS.md, and overwrote user.name/email and core.bare
+# in .git/config. Each call site now clears them too (#80); clearing here covers the next one.
+if ! env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY -u GIT_COMMON_DIR make gates; then
   echo "❌ ERROR: gates failed. Nothing pushed. Fix them, or skip deliberately:"
   echo "   SKIP_GATE=1 git push …"
   exit 1
