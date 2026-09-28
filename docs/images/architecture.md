@@ -77,7 +77,7 @@ AWS Transform 経由の移行は、データが流れる経路と、それを制
 
 > **この節は検証結果ではありません。** Phase 1（リホスト）だけが本プロジェクトの検証範囲で、Phase 2 / Phase 3 と選択肢は整理です。図の中の枠のタイトルにも同じことを書いています。
 
-![現在地の VMware ESXi から、リホスト以外の選択肢（Amazon Elastic VMware Service / NC2 + ONTAP / Red Hat OpenShift Service on AWS）と、Phase 1 リホスト（Amazon EC2 と Amazon FSx for NetApp ONTAP の iSCSI LUN / NFS / SMB）、Phase 2 リプラットフォーム（上の行に Amazon Elastic Container Service / Amazon Elastic Kubernetes Service / AWS Batch / AWS Parallel Computing Service / AWS Deadline Cloud、下の行に Amazon CloudFront / AWS Transfer Family / S3 Access Points / FSx for ONTAP の NFS / SMB / iSCSI）、Phase 3 リファクタ（上の行に AWS Fargate / AWS Lambda、下の行に Amazon Simple Storage Service / Amazon DynamoDB / S3 Access Points / FSx for ONTAP）へ段が進む図。](../_assets/images/atx-fsxn-migration-journey.svg)
+![現在地の VMware ESXi から、リホスト以外の選択肢（Amazon Elastic VMware Service / NC2（Nutanix） / Red Hat OpenShift Service on AWS）と、Phase 1 リホスト（Amazon EC2 と Amazon FSx for NetApp ONTAP の iSCSI LUN / NFS / SMB）、Phase 2 リプラットフォーム（上の行に Amazon Elastic Container Service / Amazon Elastic Kubernetes Service / AWS Batch / AWS Parallel Computing Service / AWS Deadline Cloud、下の行に Amazon CloudFront / AWS Transfer Family / S3 Access Points / FSx for ONTAP の NFS / SMB / iSCSI）、Phase 3 リファクタ（上の行に AWS Fargate / AWS Lambda、下の行に Amazon Simple Storage Service / Amazon DynamoDB / S3 Access Points / FSx for ONTAP）へ段が進む図。](../_assets/images/atx-fsxn-migration-journey.svg)
 
 図 6: リホストから先の段と、リホスト以外の選択肢。各段は上の行がコンピュート、下の行がデータの入口とストレージです。
 
@@ -87,7 +87,7 @@ AWS Transform 経由の移行は、データが流れる経路と、それを制
 
 **段の中に線を引いているのは Phase 1 だけです。** Phase 2 の Amazon Elastic Container Service と Amazon Elastic Kubernetes Service は互いに代替であって流れではないので、矢印を引くと「ECS の次が EKS」と読めてしまいます。枠と並びが「この段の構成要素」を表しています。Phase 1 の Amazon EC2 → FSx for ONTAP だけは実測した経路なので引いています。
 
-NC2（Nutanix）だけ箱で描いてあるのはサードパーティの製品だからです。公式アイコンは AWS のサービスにだけ使います。S3 Access Points はサービスではなくファイルシステムの前に置く入口なので、サービスアイコンではなくリソースアイコン（48px）を使い、両方の段で FSx for ONTAP の手前に並べています。
+NC2（Nutanix）だけ箱で描いてあるのはサードパーティの製品だからです。AWS の公式アイコンは AWS のサービスにだけ使います。Nutanix のロゴは、第三者の使用に Nutanix の書面の許可が要るため使っていません（[Nutanix Trademark Usage Guidelines](https://www.nutanix.com/legal/trademark-usage-guidelines)）。S3 Access Points はサービスではなくファイルシステムの前に置く入口なので、サービスアイコンではなくリソースアイコン（48px）を使い、両方の段で FSx for ONTAP の手前に並べています。
 
 ---
 
@@ -95,9 +95,9 @@ NC2（Nutanix）だけ箱で描いてあるのはサードパーティの製品�
 
 この 2 枚は検証結果ではなく整理です。**それでも AWS のサービスは公式アイコンと公式サービス名で描いています。** 読者がサービスを取り違える方が、整理の図が構成図に見えることより害が大きいためです。
 
-![AWS が公式に示す VMware ワークロードの 5 つのパスウェイを 5 段に並べた図。1 段目は Amazon EC2 への移行、2 段目は AWS 上でのモダナイゼーション、3 段目は AWS 上での VMware 継続、4 段目はオンプレミスでの AWS 実行、5 段目は AWS 上でのサードパーティハイパーバイザー。](../_assets/images/atx-fsxn-vmware-pathways.svg)
+![AWS が公式に示す VMware ワークロードの 5 つのパスウェイを 5 段に並べた図。1 段目は Amazon EC2 への移行、2 段目は AWS 上でのモダナイゼーション、3 段目は AWS 上での VMware 継続、4 段目はオンプレミスでの AWS 実行で AWS Outposts と NetApp ONTAP、5 段目は AWS 上でのサードパーティハイパーバイザーで Red Hat OpenShift Service on AWS と Amazon FSx for NetApp ONTAP、Nutanix Cloud Clusters on AWS の箱。](../_assets/images/atx-fsxn-vmware-pathways.svg)
 
-図 7: AWS が公式に示す 5 つのパスウェイ。**どの段でも Amazon FSx for NetApp ONTAP をデータ層に置けることを位置で示しています。** 段の間に線を引いていないのは、5 つが順序ではなく選択肢だからです。
+図 7: AWS が公式に示す 5 つのパスウェイ。**どの段でも Amazon FSx for NetApp ONTAP をデータ層に置けることを位置で示しています。** 段の間に線を引いていないのは、5 つが順序ではなく選択肢だからです。4 段目の NetApp ONTAP は NetApp のマークで、AWS のアイコンパッケージには含まれません。5 段目の Nutanix Cloud Clusters on AWS は FSx for ONTAP と結線していません。両者を組み合わせた構成は、公開情報で確認できていないためです。
 
 移行ツール（AWS Transform / AWS Application Migration Service / Cirrus Migrate Cloud / Shift Toolkit）は図に入れていません。4 つ足すと 1 段が 2 行になり、図の主題がツールの一覧に移ります。ツールの選び方は [移行方式比較](../ja/migration-method-comparison.md) にあります。
 

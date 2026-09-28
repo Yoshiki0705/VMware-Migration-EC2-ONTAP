@@ -63,6 +63,16 @@ figure exists to remove. Name the object in a box instead. Do not substitute ano
 vendor's mark for a missing icon either; a stand-in attributes the service to whoever's
 mark was borrowed.
 
+## Vendor marks outside the AWS package
+
+A product's own mark is the right attribution for that product, and `CUSTOM_ICONS` in the
+builder holds the ones in use (files under `docs/_assets/icons/`). **Add one only when the
+owner's terms allow it, and record the basis in the comment beside the entry.** The NetApp
+ONTAP mark is there on that basis. The Nutanix logo is not: Nutanix's trademark guidelines
+require express written permission for third-party use of its corporate logo marks, so
+Nutanix is drawn as a text box with its word mark spelled in full. A logo being
+downloadable from a vendor's media page is not permission.
+
 ## Verification is visual
 
 `ET.parse()` passing proves nothing about the picture, and neither does `--check`. Export
