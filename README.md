@@ -21,6 +21,15 @@
 | PoC 環境を構築したい | [クイックスタート](docs/ja/quickstart.md) | 15 min |
 | iSCSI LUN を設定したい | [iSCSI セットアップ](docs/ja/fsxn-iscsi-setup.md) | 15 min |
 
+**解説記事**（シリーズ「AWS モダナイゼーションのデータ基盤」）
+
+| 回 | 日本語 | English |
+|:---|:------|:--------|
+| 第 1 回 | [VMware 移行を入口に AWS モダナイゼーションを設計する〜データ基盤に FSx for ONTAP を選ぶ理由〜](https://hakobiya.hatenablog.com/entry/fsxn-vmware-migration-options-ec2) | [dev.to](https://dev.to/aws-builders/designing-aws-modernization-with-vmware-migration-as-the-entry-point-why-fsx-for-ontap-as-the-3k24) |
+| 第 2 回 | [AWS Transform が FSx for ONTAP へのブロックストレージ移行をサポート — EC2 ソースでの実機検証](https://hakobiya.hatenablog.com/entry/fsxn-aws-transform-mgn-migration-target) | [dev.to](https://dev.to/aws-builders/aws-transform-now-supports-block-storage-migration-to-fsx-for-ontap-benefits-and-pitfalls-from-a-1hhe) |
+
+第 2 回の元になった検証の詳細は [AWS Transform の FSx for ONTAP サポート GA 検証レポート](docs/ja/atx-fsxn-ga-verification.md) にあります。移行の先の段階（コンテナ化・サーバーレス・DR・運用）の読み方は、Hub の [モダナイゼーション旅程マップ](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/modernization-journey-map.md) にまとめています。
+
 > **移行ランブックに載らない前提**（切り戻せる時点、Finalize の容量ピーク、ACL 保持、LUN 配置と復旧の粒度）は、姉妹リポジトリの [FSx for ONTAP Adoption Playbook — 03 移行](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/playbooks/03-migrate/README.md) にあります。ここでは複製せず参照します。
 
 <details><summary>📂 全ドキュメント一覧</summary>
