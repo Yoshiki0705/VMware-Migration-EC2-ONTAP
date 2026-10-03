@@ -40,6 +40,8 @@
 
 ## 2. 操作手段（2通り）
 
+操作には 2 通りあります。AWS マネジメントコンソール（2A）と、本リポジトリで構成済みの AWS Transform MCP サーバー（2B）です。
+
 ### 2A. AWS マネジメントコンソール
 
 - AWS Transform コンソールで VMware migration の transformation path を開始。
@@ -454,6 +456,8 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 ---
 
 ## 8. 検証実績（2026-06 実施）
+
+2026-06 の Public Preview 期に実施した検証です。画面確認結果（8.1）、旧 MGN との関係整理（8.2）、現時点の制約・確認中事項（8.3）、次ステップ（8.4）の順にまとめます。
 
 ### 8.1 AWS Transform 画面確認結果
 

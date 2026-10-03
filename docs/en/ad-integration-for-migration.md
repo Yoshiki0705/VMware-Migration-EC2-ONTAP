@@ -135,6 +135,8 @@ Ports required for FSx for ONTAP SVM communication with on-prem AD Domain Contro
 
 ## SMB Share SID Preservation During Migration
 
+This covers, in order: what a SID is, how it is preserved by migration method, the mandatory conditions for preservation, the preservation flow with Shift Toolkit, caveats and pitfalls, and the verification procedure.
+
 ### What is a SID?
 
 A Security Identifier (SID) uniquely identifies users, groups, and computers in Windows / AD environments. NTFS ACLs record access permissions using SIDs, so the ability to resolve the same SIDs after migration is a prerequisite for access permission preservation.
@@ -171,6 +173,8 @@ A Security Identifier (SID) uniquely identifies users, groups, and computers in 
 ```
 
 ### Caveats and Pitfalls
+
+Four pitfalls come up when preserving SIDs: computer account conflicts, sIDHistory handling, local SIDs, and inherited versus explicit ACLs.
 
 #### 1. Computer Account Conflicts
 
@@ -217,6 +221,8 @@ aws fsx describe-storage-virtual-machines \
 ---
 
 ## Deployment Steps
+
+Run in order: deploy the CloudFormation stack (1), deploy AD Connector only if required (2), and join the SVM to AD (3).
 
 ### 1. Deploy CloudFormation Stack
 

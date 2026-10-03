@@ -40,6 +40,8 @@ VMware ESXi + ONTAP                         Amazon EC2 (standby / on-demand laun
 
 ## 3. Preparation (Normal Operations)
 
+Preparation to complete during normal operations, in order: open the network (3.1), establish the SnapMirror relationship (3.2), and keep monitoring replication health (3.3).
+
 ### 3.1 Network
 
 - On-premises ONTAP ↔ FSx for ONTAP: Open SnapMirror ports (intercluster LIF, TCP 11104/11105) over VPN/DX

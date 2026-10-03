@@ -40,6 +40,8 @@ VMware ESXi + ONTAP                         Amazon EC2 (待機/オンデマン�
 
 ## 3. 事前準備（平常時）
 
+平常時に済ませておく準備です。ネットワークの開放（3.1）、SnapMirror 関係の確立（3.2）、レプリケーション健全性の継続監視（3.3）の順に進めます。
+
 ### 3.1 ネットワーク
 
 - オンプレ ONTAP ↔ FSx for ONTAP 間: SnapMirror 用ポート（intercluster LIF、TCP 11104/11105）を VPN/DX 経由で開放
