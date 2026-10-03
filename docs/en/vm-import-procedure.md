@@ -19,6 +19,8 @@ This procedure transfers a VMware VMDK to AWS via S3 and registers it as an AMI.
 
 ## Procedure
 
+Steps 1 through 6 run in order: export the VMDK, upload it to S3, run `import-image`, watch the progress, launch an EC2 instance from the resulting AMI, and verify it.
+
 ### Step 1: Export VMDK from VMware
 
 ```bash

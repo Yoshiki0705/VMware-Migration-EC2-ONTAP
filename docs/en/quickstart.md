@@ -6,6 +6,8 @@
 
 ## Prerequisites
 
+Meet the following on both the on-premises side and the AWS side.
+
 ### On-Premises
 
 - VMware vCenter 7.0.3+ (ESXi hosts + NFS datastore)

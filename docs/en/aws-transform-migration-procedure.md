@@ -40,6 +40,8 @@ Organized based on the official blog ([Accelerating VMware migration](https://aw
 
 ## 2. Operation Methods (Two Options)
 
+There are two ways to operate: the AWS Management Console (2A) and the AWS Transform MCP server pre-configured in this repository (2B).
+
 ### 2A. AWS Management Console
 
 - Start the VMware migration transformation path in the AWS Transform console.
@@ -454,6 +456,8 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 ---
 
 ## 8. Verification Results (2026-06)
+
+This is the verification done during the 2026-06 Public Preview period, in order: console findings (8.1), the relationship to the former MGN (8.2), current constraints and items under investigation (8.3), and next steps (8.4).
 
 ### 8.1 AWS Transform Console Findings
 

@@ -135,6 +135,8 @@ FSx for ONTAP SVM がオンプレ AD ドメインコントローラーと通信�
 
 ## 移行時の SMB 共有 SID 保持に関する注意事項
 
+SID の定義、移行パスごとの保持状況、保持のための必須条件、Shift Toolkit での保持フロー、注意事項と落とし穴、検証手順の順にまとめます。
+
 ### SID の定義
 
 Security Identifier (SID) は Windows / AD 環境でユーザー・グループ・コンピュータを一意に識別する値である。NTFS ACL は SID ベースでアクセス権を記録しているため、移行後も同じ SID が解決可能であることが、アクセス権維持の前提条件になる。
@@ -171,6 +173,8 @@ Security Identifier (SID) は Windows / AD 環境でユーザー・グループ�
 ```
 
 ### 注意事項と落とし穴
+
+SID 保持で踏みやすい落とし穴を 4 つ挙げます。コンピュータアカウントの重複、sIDHistory の扱い、ローカル SID、継承 ACL と明示 ACL です。
 
 #### 1. コンピュータアカウントの重複
 
@@ -217,6 +221,8 @@ aws fsx describe-storage-virtual-machines \
 ---
 
 ## デプロイ手順
+
+CloudFormation スタックのデプロイ（1）、必要な場合のみ AD Connector のデプロイ（2）、SVM の AD 参加（3）の順に実行します。
 
 ### 1. CloudFormation スタックのデプロイ
 
