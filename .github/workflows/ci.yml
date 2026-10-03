@@ -62,9 +62,10 @@ jobs:
       - name: Role-name labels on notes and headings
         run: make role-labels
 
-      # Report-only for now (the make recipe carries no --fail), so a D1 finding
-      # does not fail the job yet. FEAT-003 flips it to gating once the prose is
-      # clean. It is wired here as well as in `make gates` because
+      # Gating: the make recipe carries --fail, so a fail-tier (D1/D2/D5/D14)
+      # finding fails the job. It was report-only until the reader-facing corpus
+      # was cleared of those four, then flipped in the same change that cleared
+      # them. It is wired here as well as in `make gates` because
       # test_ci_gate_parity.py requires the two files to list the same set.
       - name: AI-style prose detector
         run: make ai-style
