@@ -3,7 +3,7 @@
 **目的**: オンプレミス VMware/ONTAP 環境のデータを Amazon FSx for NetApp ONTAP へ SnapMirror で継続レプリケーションし、災害時に Amazon EC2 で復旧する DR 手順。
 
 > ⚠️ **スコープと前提（distinction discipline）**
-> - 本 runbook は **DR（継続レプリケーション＋復旧）**を対象とする。一度きりの移行（リホスト）は別ドキュメント（Shift Toolkit / AWS Transform 手順）を参照。
+> - 本 runbook は **DR（継続レプリケーション＋復旧）** を対象とする。一度きりの移行（リホスト）は別ドキュメント（Shift Toolkit / AWS Transform 手順）を参照。
 > - **AWS Transform は移行サービスであり、継続レプリケーション型 DR のオーケストレーターではない。** DR のデータ複製は SnapMirror が担う。AWS ネイティブ DR を比較検討する場合は AWS Elastic Disaster Recovery (DRS) が候補だが、DRS は EBS ベースで FSx for ONTAP ランディングとは設計が異なる（本 runbook の対象外）。
 > - 数値（RPO/RTO 等）は検証で実測する目標値であり、保証値ではない。
 

@@ -563,7 +563,7 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 - **NetApp ユーザー**にとっては、ONTAP の Snapshot、FlexClone、SnapMirror、storage efficiency といったデータ管理の強みを、AWS 上の FSx for ONTAP でも活かせる機会になります。
 - **VMware ユーザー**にとっては、既存の VM 資産を活かしながら、移行先の選択肢を増やし、ライセンス、運用、将来のクラウド戦略を見直すきっかけになります。
 
-私はこの検証を通じて、VMware から AWS への移行を「単なるリホスト」ではなく、**「ONTAP のデータ管理を活かした AWS 上での再設計」**として整理していきたいと考えています。
+私はこの検証を通じて、VMware から AWS への移行を、リホストにとどめず「ONTAP のデータ管理を活かした AWS 上での再設計」として整理していきたいと考えています。
 
 ---
 

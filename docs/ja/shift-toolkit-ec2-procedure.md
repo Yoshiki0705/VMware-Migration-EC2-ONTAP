@@ -367,13 +367,13 @@
 合計見積もり                                                 : 30 分 〜 2.5 時間
 ```
 
-> **\*** SnapMirror final update: VM shutdown 後の差分量に依存。事前に継続レプリケーションが走っていれば差分は極小（changed blocks のみ）。
+> `*` SnapMirror final update: VM shutdown 後の差分量に依存。事前に継続レプリケーションが走っていれば差分は極小（changed blocks のみ）。
 >
-> **\*\*** VMDK → RAW 変換: ONTAP CLI での変換。ディスクサイズと ONTAP のバックエンド性能に依存。
+> `**` VMDK → RAW 変換: ONTAP CLI での変換。ディスクサイズと ONTAP のバックエンド性能に依存。
 >
-> **\*\*\*** S3 アップロード: ネットワーク帯域に強く依存。VPN 経由 vs Direct Connect で大きく異なる。FSx for ONTAP から同一リージョンの S3 へのアップロードであれば AWS 内部ネットワークを使用し高速。
+> `***` S3 アップロード: ネットワーク帯域に強く依存。VPN 経由 vs Direct Connect で大きく異なる。FSx for ONTAP から同一リージョンの S3 へのアップロードであれば AWS 内部ネットワークを使用し高速。
 >
-> **\*\*\*\*** import-image: AWS 側の内部処理。サイズとリージョンの混雑度に依存。コントロール不可。
+> `****` import-image: AWS 側の内部処理。サイズとリージョンの混雑度に依存。コントロール不可。
 
 #### VMDK サイズ別の所要時間目安
 

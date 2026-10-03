@@ -153,5 +153,43 @@ class CopyableCli(unittest.TestCase):
         self.assertEqual(self.run_cli("--selftest").returncode, 0)
 
 
+class TheMakeTargetGates(unittest.TestCase):
+    """The flip from report-only to gating lives in the Makefile recipe, not the detector.
+
+    `test_fail_flag_gates_and_default_does_not` proves the CLI honours `--fail`; this proves the
+    `ai-style` make target actually passes it, so a silent revert to `--summary`-only (report-only)
+    is caught. Report-only vs gating here is the ABSENCE vs PRESENCE of `--fail` in the recipe.
+    """
+
+    def recipe(self) -> str:
+        text = (ROOT / "Makefile").read_text(encoding="utf-8")
+        lines = text.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.startswith("ai-style:"))
+        body = []
+        for line in lines[start + 1 :]:
+            if line.startswith("\t") or line.startswith("\t#") or not line.strip():
+                body.append(line)
+                continue
+            if line.startswith(("#", ".PHONY", " ")):
+                body.append(line)
+                continue
+            break
+        return "\n".join(body)
+
+    def test_recipe_runs_the_detector_with_fail(self) -> None:
+        recipe = self.recipe()
+        self.assertIn("ai_style_rules.py", recipe)
+        detector_lines = [
+            line
+            for line in recipe.splitlines()
+            if "ai_style_rules.py" in line and "--selftest" not in line
+        ]
+        self.assertTrue(detector_lines, "the ai-style recipe runs the detector only via --selftest")
+        self.assertTrue(
+            all("--fail" in line for line in detector_lines),
+            "the ai-style recipe is report-only (no --fail); the gate does not gate",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

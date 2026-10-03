@@ -367,13 +367,13 @@ The VM downtime during migration is the sum of the following components. **Assum
 Total estimate                                               : 30 min – 2.5 hours
 ```
 
-> **\*** SnapMirror final update: Depends on the amount of changed data after VM shutdown. If continuous replication has been running, the delta is minimal (changed blocks only).
+> `*` SnapMirror final update: Depends on the amount of changed data after VM shutdown. If continuous replication has been running, the delta is minimal (changed blocks only).
 >
-> **\*\*** VMDK → RAW conversion: Conversion via ONTAP CLI. Depends on disk size and ONTAP backend performance.
+> `**` VMDK → RAW conversion: Conversion via ONTAP CLI. Depends on disk size and ONTAP backend performance.
 >
-> **\*\*\*** S3 upload: Strongly depends on network bandwidth. Significant difference between VPN and Direct Connect. Upload from FSx for ONTAP to S3 in the same region uses the AWS internal network and is faster.
+> `***` S3 upload: Strongly depends on network bandwidth. Significant difference between VPN and Direct Connect. Upload from FSx for ONTAP to S3 in the same region uses the AWS internal network and is faster.
 >
-> **\*\*\*\*** import-image: AWS internal processing. Depends on size and region congestion. Not controllable.
+> `****` import-image: AWS internal processing. Depends on size and region congestion. Not controllable.
 
 #### Duration Estimates by VMDK Size
 

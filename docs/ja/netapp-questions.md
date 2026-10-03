@@ -21,7 +21,7 @@
 | ステータス | 意味 |
 |-----------|------|
 | ✅ 確認済み | 公開ブログ/ドキュメントで回答が得られた |
-| 🔬 実測で確定 | **自環境の実機検証で確定した。**公開ドキュメントの記載ではない |
+| 🔬 実測で確定 | **自環境の実機検証で確定した**。公開ドキュメントの記載ではない |
 | 🔶 部分回答 | 情報はあるが詳細確認が必要 |
 | ⬜ 未回答 | ブログ/ドキュメントでカバーされていない — 要確認 |
 
@@ -78,7 +78,7 @@ EC2 は AMI（EBS バックド）からのみブート可能で、FSx for ONTAP 
 |---|------|--------|-----------|
 | Q5 | AWS Transform の FSx for ONTAP 移行は内部で Shift Toolkit / FlexClone / SnapMirror を利用するのか、AWS ネイティブのブロックレプリケーションか? | Critical | 🔶 部分回答（実測 2026-09-04） |
 | Q6 | NetApp DII 連携は AWS Transform の discovery（計画）フェーズのみか、移行実行フェーズにも及ぶか? | High | ⬜ 未回答 |
-| Q7 | NetApp として、顧客への Shift Toolkit と AWS Transform の使い分け案内方針は（置き換え / 補完 / 並存）? | High | ⬜ 未回答（**NetApp にしか答えられない。**実測では出ない） |
+| Q7 | NetApp として、顧客への Shift Toolkit と AWS Transform の使い分け案内方針は（置き換え / 補完 / 並存）? | High | ⬜ 未回答（**NetApp にしか答えられない**。実測では出ない） |
 | Q8 | AWS Transform でコンピュート（ルート = EBS）、Shift Toolkit でデータ（FSx for ONTAP）を分担する構成は推奨構成として成立するか? | High | ✅ 確認済み |
 
 ### Q8 回答根拠（公式 Shift Toolkit EC2 手順書 2026-06）
@@ -98,9 +98,9 @@ AWS Transform との分担は別の議論。Shift 単体でこの構成を完結
 | Q5 の要素 | 実測の結果 |
 |---|---|
 | レプリケーションの方式 | **エージェント型**。ソースにエージェントを導入して実行した |
-| ONTAP 側で起きること | **SNAPSHOT フェーズ = ボリューム Snapshot、LAUNCH フェーズ = FlexClone 作成。**時刻で対応づけた |
+| ONTAP 側で起きること | **SNAPSHOT フェーズ = ボリューム Snapshot、LAUNCH フェーズ = FlexClone 作成**。時刻で対応づけた |
 | SnapMirror | 観測した経路には現れない |
-| Shift Toolkit の関与 | **判定できない。**こちらから観測する手段が無く、GA 検証レポートにも言及が無い |
+| Shift Toolkit の関与 | **判定できない**。こちらから観測する手段が無く、GA 検証レポートにも言及が無い |
 
 残るのは Shift Toolkit の関与だけで、これは NetApp / AWS への確認が必要。Q6・Q7 は実測では出ない。
 
