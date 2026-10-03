@@ -10,6 +10,8 @@ gitignored and holds only a loader that says when to read what.
 - [docs/agent/README.md](docs/agent/README.md) — index of project conventions,
   output standards (naming, vendor neutrality, public-output safety, JA/EN
   parity), and quality gates.
+- Writing-quality criteria live in the Hub, not here:
+  https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/agent/writing-quality.md
 
 ## Run the gates
 
