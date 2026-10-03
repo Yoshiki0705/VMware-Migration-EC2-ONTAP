@@ -833,6 +833,8 @@ Per-step durations from the completed migration job for Blueprint `bp-ec2-migrat
 
 **Total: approximately 1 hour 49 minutes**
 
+> **Measurement environment unverified (未確認)**: these are values from a single completed run of Blueprint `bp-ec2-migrate`; this verification did not record the boot disk size, network bandwidth, instance type, or region. The two dominant steps (S3 upload 68 min, AMI import 36 min) scale with those factors, so the 1 hour 49 minute total is a single observation rather than a general estimate (large-disk timing is an open item in 10.5).
+
 #### Analysis
 
 - **S3 upload (68 min) and AMI import (36 min) account for 95% of total time**. These two steps dominate the downtime.
