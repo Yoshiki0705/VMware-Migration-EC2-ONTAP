@@ -62,6 +62,13 @@ jobs:
       - name: Role-name labels on notes and headings
         run: make role-labels
 
+      # Report-only for now (the make recipe carries no --fail), so a D1 finding
+      # does not fail the job yet. FEAT-003 flips it to gating once the prose is
+      # clean. It is wired here as well as in `make gates` because
+      # test_ci_gate_parity.py requires the two files to list the same set.
+      - name: AI-style prose detector
+        run: make ai-style
+
       # The steps in this job must be exactly the prerequisites of `make gates`,
       # and scripts/tests/test_ci_gate_parity.py fails the build when they are
       # not. The three diagram gates below were missing for months: the Makefile

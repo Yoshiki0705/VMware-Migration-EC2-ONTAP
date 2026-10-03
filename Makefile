@@ -98,6 +98,14 @@ role-labels: ## ラベルが職種名を名乗っていないか（所見では�
 	$(PYTHON) tools/check_role_labels.py --selftest >/dev/null
 	$(PYTHON) tools/check_role_labels.py
 
+.PHONY: ai-style
+# ネットワーク不要。Hub からバイト同一でコピーした独立検出器を直接呼ぶ（audit への相乗りはしない）。
+# いまは **report-only**: recipe に `--fail` を付けないので D1 等の fail 階層所見があっても exit 0。
+# ゲート化（--fail）は FEAT-003 で散文を直し切ったあとに切り替える。
+ai-style: ## 散文の AI 調検出器（いまは report-only・--fail なし）
+	$(PYTHON) tools/ai_style_rules.py --selftest >/dev/null
+	$(PYTHON) tools/ai_style_rules.py docs/ja docs/en README.md README.en.md --exclude 'articles/*' --summary
+
 .PHONY: repo-names
 # ネットワークが必要なので ci には入れない。週次の repo-names.yml が呼ぶ。
 # 未認証の API は 1 時間 60 回なので、手元で繰り返すなら GITHUB_TOKEN を渡す:
@@ -192,7 +200,7 @@ drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow out
 # 以前は Makefile のコメントが「diagram-fonts / diagram-flow は CI で常時走らせる」と
 # 書いているのに ci.yml が drift を呼んでおらず、3 つの図の検査が一度も CI で走って
 # いなかった。集合を 2 か所に書くと、片方だけが更新される。
-gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow incoming-probes ## どこでも走る検査（CI とフックが呼ぶ）
+gates: lint format-check test cfn-lint security headings role-labels ai-style context-budget diagram-assets diagram-fonts diagram-flow incoming-probes ## どこでも走る検査（CI とフックが呼ぶ）
 
 .PHONY: ci
 ci: gates agent-config ## CI が呼ぶ集約ターゲット（gates + ~/.kiro 依存の到達性検査）
