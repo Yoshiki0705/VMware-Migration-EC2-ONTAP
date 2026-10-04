@@ -1,0 +1,57 @@
+# VMware to EC2 + FSx for ONTAP Migration Path Verification
+
+> Hands-on verification of migrating VMware ESXi virtual machines to Amazon EC2 with
+> Amazon FSx for NetApp ONTAP across multiple paths (NetApp Shift Toolkit, AWS Transform,
+> VM Import/Export). The project checks whether existing ONTAP operational models carry
+> over to AWS, and records what each migration path covers, its constraints, and the
+> conditions under which it was exercised in ap-northeast-1.
+
+## How to read this repository
+
+Japanese (`docs/ja/`) is the primary, authoritative tree; `docs/en/` mirrors it with the
+same section structure. Several migration tools are referenced in their Preview or Early
+Preview state, while the AWS Transform FSx for ONTAP target reached GA; each document states
+which applies. Cost and performance figures in the linked documents are samples from a
+specific environment, not service limits; this file points to where those figures live
+rather than restating them.
+
+## Entry points
+
+- [README (日本語)](README.md): Japanese hub; migration goals, method selection, and the document map.
+- [README (English)](README.en.md): English hub mirroring the Japanese structure.
+- [AGENTS.md](AGENTS.md): conventions and gates for coding agents working in this repository.
+- [Agent docs index](docs/agent/README.md): index of project conventions, output standards, and quality gates.
+
+## Migration paths and runbooks
+
+- [Migration method comparison](docs/ja/migration-method-comparison.md): compares the migration methods, their conditions, constraints, downtime, and FSx for ONTAP applicability.
+- [Shift Toolkit procedure](docs/ja/shift-toolkit-ec2-procedure.md): NetApp Shift Toolkit (Early Preview) procedure for VMware ESXi to EC2 with FSx for ONTAP.
+- [AWS Transform procedure](docs/ja/aws-transform-migration-procedure.md): AWS Transform rehost to EC2 with block data on FSx for ONTAP.
+- [AWS Transform FSx for ONTAP target setup](docs/ja/atx-fsxn-console-procedure.md): console steps to set FSx for ONTAP as the AWS Transform / MGN target storage.
+- [VM Import/Export procedure](docs/ja/vm-import-procedure.md): VM Import/Export fallback path (OS disk to AMI) where Shift Toolkit does not cover the OS disk.
+- [DR SnapMirror runbook](docs/ja/dr-snapmirror-runbook.md): SnapMirror-based disaster-recovery runbook covering continuous replication from on-prem VMware/ONTAP to EC2 with FSx for ONTAP, with break/promote and recovery steps.
+- [iSCSI LUN setup](docs/ja/fsxn-iscsi-setup.md): EC2 Linux to FSx for ONTAP iSCSI multipath LUN connection for the post-migration data disk.
+- [Active Directory integration](docs/ja/ad-integration-for-migration.md): Active Directory integration design to preserve SMB ACLs across the migration.
+
+## Verification and measurement records
+
+- [AWS Transform FSx for ONTAP GA verification report](docs/ja/atx-fsxn-ga-verification.md): end-to-end run in ap-northeast-1 (replication, test launch, data integrity, Finalize, teardown), with verified and unverified items separated.
+- [Feedback summary to AWS](docs/ja/atx-fsxn-feedback-to-aws.md): submission-ready summary of findings from that run; adds no new claims.
+
+## Architecture and selection
+
+- [Architecture diagrams](docs/images/architecture.md): the project's architecture diagrams and migration flows collected on one page.
+- [ONTAP capabilities as selection factors](docs/ja/ontap-capability-selection-factors.md): what each ONTAP capability does, what EBS needs instead, and the cost/time impact and constraints of each.
+- [Storage cost comparison](docs/ja/tco-comparison.md): list-price storage-cost comparison of an EBS-only versus EBS + FSx for ONTAP layout, stated explicitly as a sample rather than a production estimate.
+
+## References and planning
+
+- [Research report](docs/ja/research.md): Shift Toolkit investigation and tool-comparison report from the research phase (English counterpart: [research summary](docs/en/research-summary.md)).
+- [Quick start](docs/ja/quickstart.md): PoC environment build (VPC + FSx for ONTAP + EC2).
+- [PoC plan template](docs/ja/poc-plan-template.md): PoC execution plan template for partner/SI use.
+- [NetApp questions](docs/ja/netapp-questions.md): public-information technical questions for the NetApp side of the migration paths.
+
+## Hub and related repositories
+
+- [FSx for ONTAP Adoption Playbook — llms.txt](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/llms.txt): the cross-cutting FSx for ONTAP adoption knowledge base (lifecycle and topic axes).
+- [Workload entry map](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/workload-entry-map.md): start from the workload you run and get the first sections to read.
