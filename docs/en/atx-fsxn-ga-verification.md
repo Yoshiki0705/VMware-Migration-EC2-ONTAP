@@ -578,6 +578,24 @@ For the same reason, the blog's "Multi-AZ HA with automatic failover and zero RP
 
 **When this needs re-checking**: the pricing page states that "additional future capabilities may be introduced as paid features". **Being free is a dated fact, not a permanent property.** Re-read both sources before switching this path to the custom agent, and before relying on this report over a long period.
 
+### 9.10 Where the block performance and IOPS measurements live [Documented]
+
+**This report did not measure block performance (IOPS / throughput).** This verification was one end-to-end pass of agent-based migration (the throughput guidance in 9.3 is capacity planning, not an achieved-IOPS measurement); the target LUN's performance was not pushed with VDBENCH or similar.
+
+**Measurements that push 4 KiB random IOPS for block on a comparable ONTAP version (9.18.1 series, `ap-northeast-1`) live in the sibling [S3-Burst-on-ONTAP-Files](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files).** How far session count / queue count can be pushed, and what fraction of the provisioned IOPS it plateaus at, is recorded on one file system for both iSCSI and NVMe/TCP.
+
+| What to read | Where |
+|---|---|
+| How to push it (session/queue count, the pre-billing ANA check, the cooldown after an IOPS change) | [Block protocol testing guide](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/en/reference/block-protocol-testing-guide.md) |
+| The achieved-IOPS figures | [perf-matrix results](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/perf-matrix-results.md) |
+| How this project frames it | [What applies first when migrating as block](ontap-capability-selection-factors.md#what-applies-first-when-migrating-as-block) |
+
+**Caveat when quoting the figures**: each sibling measurement is a single run with its environment stated (generation, throughput capacity, provisioned IOPS, measurement date). It is **a different file system measured for a different purpose**, so do not read it as "the migration target will produce this value." A different environment changes the ceiling itself (9.3).
+
+**Do not read an achieved IOPS figure as a service ceiling.** The sibling's 4 KiB random read **moves widely at the same provisioned 200,000 IOPS**: about 131,600 IOPS (66%) on a deployment comparing iSCSI / NVMe/TCP under matched conditions, 203,774 IOPS (102%) with ANA enabled, and 242,093 IOPS (121%) on another deployment. **The provisioned value is a baseline, not a cap, and cache-resident reads exceed it.** The AWS blog ["SAN: a Million IOPs in AWS from Amazon FSx for NetApp ONTAP"](https://aws.amazon.com/jp/blogs/news/san-a-million-iops-in-aws-from-amazon-fsx-netapp-ontap/) states (in the Japanese edition read 2026-10-04) that for cache-friendly workloads the IOPs each file system actually delivers can greatly exceed the provisioned IOPs. What sets the achieved figure is the **disk read amplification (i.e. cache warmth)**, not a storage ceiling.
+
+**The service ceiling is far higher.** The second generation scales, in a multi-HA-pair configuration, to **a maximum of 2,400,000 SSD IOPS (200,000 × 12 HA pairs), up to 1 PiB of SSD, and 6,144 MBps per HA pair** (the generation table in [AWS: deployment options](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html), read 2026-10-04). The measurements above are all on a **single HA pair, one file system** — a different question from the service ceiling. The AWS blog also shows aggregating ten small FSx for ONTAP file systems under LVM to reach a million IOPs. **You can scale up (one bigger file system) or out (several bundled).**
+
 ## 10. Coordination with the FSx for ONTAP Adoption Playbook
 
 The sibling repository [FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) contains content that should be updated to reflect this GA.

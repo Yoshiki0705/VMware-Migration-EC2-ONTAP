@@ -578,6 +578,24 @@ MAP 2.0 のタグは FSx for ONTAP **ファイルシステム**には付与さ�
 
 **再確認が必要になる条件**: pricing ページは "additional future capabilities may be introduced as paid features" と明示している。**無料であることは日付つきの事実であって、恒久的な性質ではない。** 経路を Custom agent に変える場合、および長期間このレポートを根拠に使う場合は、上記 2 つの出典を読み直す。
 
+### 9.10 ブロック性能と IOPS の実測の所在 [文書]
+
+**本レポートはブロック性能（IOPS / スループット）を実測していない。** 本検証はエージェント型移行の 1 回の通し（9.3 のスループット指針は容量計画の話で、達成 IOPS の測定ではない）であり、移行先 LUN の性能を VDBENCH 等で詰めてはいない。
+
+**同系の ONTAP 版（9.18.1 系、`ap-northeast-1`）でブロックの 4 KiB ランダム IOPS を詰めた実測は、姉妹プロジェクト [S3-Burst-on-ONTAP-Files](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files) にある。** セッション数 / キュー数をどこまで寄せられるか、プロビジョンド IOPS に対して何割で頭打ちになるかが、同一ファイルシステム上で iSCSI と NVMe/TCP の両方について記録されている。
+
+| 読み方 | 参照先 |
+|---|---|
+| 詰め方そのもの（セッション数・キュー数、ANA の課金前チェック、IOPS 変更後のクールダウン） | [ブロックプロトコルの測定ガイド](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/block-protocol-testing-guide.md) |
+| 達成 IOPS の実測値 | [perf-matrix の結果](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/perf-matrix-results.md) |
+| このプロジェクト側での位置づけ | [ブロックで移行するときに先に効く前提](ontap-capability-selection-factors.md#ブロックで移行するときに先に効く前提) |
+
+**値を引くときの前提**: 姉妹側の実測はいずれも 1 回の測定で、測定環境（世代・スループット容量・プロビジョンド IOPS・測定日）が併記されている。**本検証とは別のファイルシステム・別の目的の測定**なので、「移行先がこの値を出す」と読み替えない。環境が違えば上限そのものが変わる（9.3）。
+
+**達成 IOPS をサービスの上限と読み替えない。** 姉妹側の 4 KiB ランダム読みは、**同じプロビジョンド 200,000 IOPS のまま条件で大きく動いている**。iSCSI / NVMe/TCP を同条件で並べたデプロイで約 131,600 IOPS（66%）、ANA を有効にしたデプロイで 203,774 IOPS（102%）、別デプロイで 242,093 IOPS（121%）。**プロビジョンド値は上限ではなく基準で、キャッシュに載る読みでは超える。** AWS も[「SAN: FSx for ONTAP による 100 万 IOPs」](https://aws.amazon.com/jp/blogs/news/san-a-million-iops-in-aws-from-amazon-fsx-netapp-ontap/)で「実際に提供される IOPs は、キャッシュフレンドリーなワークロードの場合、プロビジョニングされた IOPs を大幅に上回ることがある」と明記している。達成値を決めているのは**ディスク読み取りの増幅率（＝キャッシュ温度）**であって、ストレージの天井ではない。
+
+**サービスとしての上限はさらに上にある。** 第二世代はマルチ HA ペア構成で **SSD IOPS 最大 2,400,000（200,000 × 12 HA ペア）・SSD 最大 1 PiB・スループット 6,144 MBps/HA ペア**までスケールする（[AWS: デプロイオプション](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/high-availability-AZ.html) の世代比較表、2026-10-04 確認）。上の実測はいずれも**1 HA ペアの 1 台**で、サービスの天井とは別の話である。さらに AWS ブログは、小さめの FSx for ONTAP を 10 台並べて LVM で束ね 100 万 IOPs を出す構成も示している。**「1 台を大きくする」でも「複数台を束ねる」でも伸ばせる。**
+
 ## 10. FSx for ONTAP Adoption Playbook との連動
 
 姉妹リポジトリ [FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) 側に、本 GA を反映すべき箇所がある。
