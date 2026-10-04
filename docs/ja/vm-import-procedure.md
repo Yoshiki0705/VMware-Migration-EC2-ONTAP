@@ -19,6 +19,8 @@ VMware の VMDK を S3 経由で AWS に転送し、AMI として登録する手
 
 ## 手順
 
+Step 1 から Step 6 までを順に実行します。VMDK をエクスポートし、S3 へアップロードし、`import-image` を実行し、進捗を確認し、できた AMI から EC2 インスタンスを起動し、起動後を確認します。
+
 ### Step 1: VMware からの VMDK エクスポート
 
 ```bash

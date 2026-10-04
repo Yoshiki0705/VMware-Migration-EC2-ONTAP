@@ -2,13 +2,13 @@
 
 **目的**: AWS Transform（エージェント型 AI の移行サービス）を用いて、VMware ワークロードを Amazon EC2 へリホストし、ブロックデータを Amazon FSx for NetApp ONTAP へ配置する移行手順。
 
-> ✅ **GA / 2026-08-30**。FSx for ONTAP を移行先とする機能は GA した。[（一次情報: What's New）](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/) 実機検証の結果は [AWS Transform の FSx for ONTAP 対応 GA 検証](atx-fsxn-ga-verification.md) にある。**本手順書は Public Preview 期（2026-06）に書いたもので、UI とラベルは GA 後に変わっている可能性がある。**一次情報: 一次情報: [What's New](https://aws.amazon.com/jp/about-aws/whats-new/2026/06/aws-transform-vmware-fsx-for-ontap-preview/) / [AWS Transform pricing](https://aws.amazon.com/transform/pricing/)
+> ✅ **GA / 2026-08-30**。FSx for ONTAP を移行先とする機能は GA した。[（一次情報: What's New）](https://aws.amazon.com/about-aws/whats-new/2026/09/aws-transform-fsx-netapp-ontap-support/) 実機検証の結果は [AWS Transform の FSx for ONTAP 対応 GA 検証](atx-fsxn-ga-verification.md) にある。**本手順書は Public Preview 期（2026-06）に書いたもので、UI とラベルは GA 後に変わっている可能性がある**。一次情報: [What's New](https://aws.amazon.com/jp/about-aws/whats-new/2026/06/aws-transform-vmware-fsx-for-ontap-preview/) / [AWS Transform pricing](https://aws.amazon.com/transform/pricing/)
 
 ---
 
 ## 0. 位置づけ
 
-- AWS Transform は **移行ウェーブ全体（discovery → 計画 → コンピュート + ネットワーク + ストレージ）**を回す AWS ネイティブのオーケストレーター。
+- AWS Transform は **移行ウェーブ全体（discovery → 計画 → コンピュート + ネットワーク + ストレージ）** を回す AWS ネイティブのオーケストレーター。
 - VMware 移行エージェント自体の利用は **無料**。移行先の AWS リソース（EC2 / EBS / FSx for ONTAP / 転送等）は通常課金。
 - **OS/ルートは EBS、データは FSx for ONTAP（iSCSI）** に収束する点は他手法と同じ（EC2 は FSx for ONTAP から直接ブート不可）。
 
@@ -39,6 +39,8 @@
 ---
 
 ## 2. 操作手段（2通り）
+
+操作には 2 通りあります。AWS マネジメントコンソール（2A）と、本リポジトリで構成済みの AWS Transform MCP サーバー（2B）です。
 
 ### 2A. AWS マネジメントコンソール
 
@@ -454,6 +456,8 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 ---
 
 ## 8. 検証実績（2026-06 実施）
+
+2026-06 の Public Preview 期に実施した検証です。画面確認結果（8.1）、旧 MGN との関係整理（8.2）、現時点の制約・確認中事項（8.3）、次ステップ（8.4）の順にまとめます。
 
 ### 8.1 AWS Transform 画面確認結果
 

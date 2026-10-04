@@ -29,6 +29,11 @@ GITHUB_TOKEN=$(gh auth token) make repo-names
 | `context-budget` | `scripts/check_agent_context_budget.py` | AGENTS.md, `.kiro/steering/` |
 | `role-labels` | `tools/check_role_labels.py` (selftest, then scan) | headings and leading bold labels in `*.md`, **excluding code fences** |
 | `repo-names` | `tools/check_repo_names.py` (selftest, then resolve) | every `*.md` outside the script's `SKIP` set, **including code fences** |
+| `ai-style` | `tools/ai_style_rules.py` (selftest, then scan with `--fail`) | `docs/ja docs/en README.md README.en.md`, excluding `articles/*` and the temporarily excluded file below |
+
+`ai-style` gates the fail tier (D1/D2/D5/D14) with `--fail`. It was report-only
+until the reader-facing corpus was cleared of those four, then flipped in the same
+change that cleared them.
 
 Those last two want opposite things from the same text, which is why neither can
 share a fence-stripping helper. A fenced example of a forbidden label is a
@@ -70,6 +75,7 @@ reintroduces the divergence described below.
 | A commit landed on the default branch | A branch was created, the session returned to `main` unnoticed, and the commit landed there. Nothing was pushed; recovery was a branch-pointer move. The only control was remembering to check, which fails precisely when attention is elsewhere | `.githooks/pre-commit` refuses to commit on `main`/`master` unless `ALLOW_MAIN_COMMIT=1`. Verified in a scratch repository: blocked on `main`, allowed with the override, allowed on a feature branch |
 | A rename check was silent on the rename it was written for | The first version compared the final URL after following redirects. **GitHub resolves repository names case-insensitively and serves the requested casing with 200**, so a case-only rename never redirects and reads as current. This repository's own rename was case-only. The break test used one of the names that does redirect, so the gap did not surface | `tools/check_repo_names.py` asks the API for `full_name`. `scripts/tests/test_check_repo_names.py` parametrizes the break test over **both** rename families — case-only and slug — because firing on one member proves nothing about the rest |
 | A first control test appeared to prove the scanner was broken | The planted value was `AKIAIOSFODNN7EXAMPLE`, which gitleaks' default config allowlists as a known placeholder | Control inputs must be values the rules actually reject. The working probe plants a private key block, an RFC 1918 address, an internal hostname, an account ID, an address, and a vCenter password, and asserts all six rules fire |
+| A file carrying fail-tier hits was owned by an open PR, blocking the gate flip | Flipping `ai-style` to `--fail` while `docs/ja/atx-fsxn-ga-verification.md` (owned by open PR #40) still has 4 D1 would leave CI red indefinitely on an unrelated, stale PR. Holding the whole flip report-only would leave every clean file ungated for one blocked file. Excluding the file permanently and silently would leave it unguarded forever | Gate the whole corpus with `--fail` now and exclude only the one PR-owned file, with the exclusion marked `# TEMP:` in the Makefile and tracked in issue #86. Clearing it is a two-flag deletion plus fixing the 4 D1 once PR #40 resolves. **The detector matches `--exclude` against each path arg's relative path, so the basename `atx-fsxn-ga-verification.md` excludes both the `docs/ja/` and `docs/en/` copies.** When an excluded (PR-owned) file carries fail-tier hits: gate everything else, track the one file's exclusion with an issue, do not hold the flip, do not exclude permanently |
 
 ## Guard outcomes
 
@@ -107,3 +113,9 @@ Verify both modes and the rejection path before trusting a clean result:
 gitleaks detect --config .gitleaks.toml --no-git --source .   # tree
 gitleaks detect --config .gitleaks.toml                       # history, as CI sees it
 ```
+
+## Blocked features
+
+| Item | Reason | Follow-up |
+|---|---|---|
+| `ai-style` does not yet gate `docs/ja/atx-fsxn-ga-verification.md` (and its `docs/en/` mirror) | The file carries 4 D1 fail-tier findings at lines 178 and 736 (2 per line), but it is owned by open PR #40, so the writing-quality pass must not edit it. The 4 D1 are identical on `main`, on the PR #40 branch, and here; PR #40 does not touch those lines, so merging it will not clear them | Issue #86. Once PR #40 lands or closes: fix the 4 D1 (move the `**` outside the bracket/punctuation, verified against the detector), then remove the single `--exclude 'atx-fsxn-ga-verification.md'` flag from the `ai-style` recipe and confirm `make ai-style` still exits 0 |

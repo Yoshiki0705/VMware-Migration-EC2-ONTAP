@@ -98,6 +98,18 @@ role-labels: ## ラベルが職種名を名乗っていないか（所見では�
 	$(PYTHON) tools/check_role_labels.py --selftest >/dev/null
 	$(PYTHON) tools/check_role_labels.py
 
+.PHONY: ai-style
+# ネットワーク不要。Hub からバイト同一でコピーした独立検出器を直接呼ぶ（audit への相乗りはしない）。
+# ゲート化済み: recipe が `--fail` を付けるので D1/D2/D5/D14（fail 階層）が 1 件でもあれば exit 1。
+# 散文を直し切った同じ変更で report-only から切り替えた（FEAT-003）。
+ai-style: ## 散文の AI 調検出器（fail tier D1/D2/D5/D14 を --fail で gate する）
+	$(PYTHON) tools/ai_style_rules.py --selftest >/dev/null
+	# TEMP: atx-fsxn-ga-verification.md (ja + en mirror) has 4 D1 hits but is owned by
+	# open PR #40; the detector matches --exclude against each path arg's relative path,
+	# so the basename excludes both docs/ja/ and docs/en/ copies. Remove this --exclude
+	# once #40 lands or closes and the 4 D1 (lines 178/736) are fixed. Tracked in issue #86.
+	$(PYTHON) tools/ai_style_rules.py docs/ja docs/en README.md README.en.md --exclude 'articles/*' --exclude 'atx-fsxn-ga-verification.md' --fail
+
 .PHONY: repo-names
 # ネットワークが必要なので ci には入れない。週次の repo-names.yml が呼ぶ。
 # 未認証の API は 1 時間 60 回なので、手元で繰り返すなら GITHUB_TOKEN を渡す:
@@ -192,7 +204,7 @@ drift: agent-config context-budget diagram-assets diagram-fonts diagram-flow out
 # 以前は Makefile のコメントが「diagram-fonts / diagram-flow は CI で常時走らせる」と
 # 書いているのに ci.yml が drift を呼んでおらず、3 つの図の検査が一度も CI で走って
 # いなかった。集合を 2 か所に書くと、片方だけが更新される。
-gates: lint format-check test cfn-lint security headings role-labels context-budget diagram-assets diagram-fonts diagram-flow incoming-probes ## どこでも走る検査（CI とフックが呼ぶ）
+gates: lint format-check test cfn-lint security headings role-labels ai-style context-budget diagram-assets diagram-fonts diagram-flow incoming-probes ## どこでも走る検査（CI とフックが呼ぶ）
 
 .PHONY: ci
 ci: gates agent-config ## CI が呼ぶ集約ターゲット（gates + ~/.kiro 依存の到達性検査）

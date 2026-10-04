@@ -62,6 +62,14 @@ jobs:
       - name: Role-name labels on notes and headings
         run: make role-labels
 
+      # Gating: the make recipe carries --fail, so a fail-tier (D1/D2/D5/D14)
+      # finding fails the job. It was report-only until the reader-facing corpus
+      # was cleared of those four, then flipped in the same change that cleared
+      # them. It is wired here as well as in `make gates` because
+      # test_ci_gate_parity.py requires the two files to list the same set.
+      - name: AI-style prose detector
+        run: make ai-style
+
       # The steps in this job must be exactly the prerequisites of `make gates`,
       # and scripts/tests/test_ci_gate_parity.py fails the build when they are
       # not. The three diagram gates below were missing for months: the Makefile

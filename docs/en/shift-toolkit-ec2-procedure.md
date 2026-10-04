@@ -58,6 +58,8 @@
 
 ## 2. Prerequisites
 
+Confirm, in order: supported guest operating systems (2.0), VM requirements (2.1), storage requirements (2.2), AWS-side preparation (2.3), and Shift Toolkit enablement (2.4).
+
 ### 2.0 Supported Guest Operating Systems
 
 Before migration, verify that the source VM's guest OS is included in the following support matrix.
@@ -102,6 +104,8 @@ Before migration, verify that the source VM's guest OS is included in the follow
 | Network connectivity | Connection established between on-premises and AWS VPC (Direct Connect or VPN) |
 
 ### 2.3 AWS-Side Preparation
+
+Prepare the IAM policy (vmimport role), the security groups, and the other items below.
 
 #### IAM Policy (vmimport role)
 
@@ -260,6 +264,8 @@ Before migration, verify that the source VM's guest OS is included in the follow
 
 ## 3. Migration Procedure
 
+Proceed in order through site registration (Phase 1), resource group creation (Phase 2), Blueprint creation (Phase 3), and migration execution (Phase 4), then estimate downtime composition and duration.
+
 ### Phase 1: Site Registration
 
 1. Log in to the Shift Toolkit UI
@@ -367,13 +373,13 @@ The VM downtime during migration is the sum of the following components. **Assum
 Total estimate                                               : 30 min – 2.5 hours
 ```
 
-> **\*** SnapMirror final update: Depends on the amount of changed data after VM shutdown. If continuous replication has been running, the delta is minimal (changed blocks only).
+> `*` SnapMirror final update: Depends on the amount of changed data after VM shutdown. If continuous replication has been running, the delta is minimal (changed blocks only).
 >
-> **\*\*** VMDK → RAW conversion: Conversion via ONTAP CLI. Depends on disk size and ONTAP backend performance.
+> `**` VMDK → RAW conversion: Conversion via ONTAP CLI. Depends on disk size and ONTAP backend performance.
 >
-> **\*\*\*** S3 upload: Strongly depends on network bandwidth. Significant difference between VPN and Direct Connect. Upload from FSx for ONTAP to S3 in the same region uses the AWS internal network and is faster.
+> `***` S3 upload: Strongly depends on network bandwidth. Significant difference between VPN and Direct Connect. Upload from FSx for ONTAP to S3 in the same region uses the AWS internal network and is faster.
 >
-> **\*\*\*\*** import-image: AWS internal processing. Depends on size and region congestion. Not controllable.
+> `****` import-image: AWS internal processing. Depends on size and region congestion. Not controllable.
 
 #### Duration Estimates by VMDK Size
 
@@ -504,6 +510,8 @@ Start-Process msiexec.exe -ArgumentList "/i","$tmp\EC2Launch.msi","/quiet" -Wait
 ---
 
 ## 5. Post-Migration Verification
+
+Verify, in order: the EC2 instance (5.1), the iSCSI data disk (5.2), the iSCSI multipath configuration (5.3), and ONTAP features (5.4).
 
 ### 5.1 EC2 Instance Verification
 
@@ -796,6 +804,8 @@ snapmirror resync -destination-path <SVM_NAME>:<VOLUME_NAME>
 
 ## 10. Verification Results (2026-06)
 
+Verification done in 2026-06, in order: the results summary (10.1), measured timing data (10.2), FSx for ONTAP verification (10.3), the multi-disk configuration failure root cause and workaround (10.4), and planned next verifications (10.5).
+
 ### 10.1 Results Summary
 
 | Blueprint | Configuration | Result | Notes |
@@ -822,6 +832,8 @@ Per-step durations from the completed migration job for Blueprint `bp-ec2-migrat
 | 10 | Launching EC2 instances | 15.1 sec |
 
 **Total: approximately 1 hour 49 minutes**
+
+> **Measurement environment unverified (未確認)**: these are values from a single completed run of Blueprint `bp-ec2-migrate`; this verification did not record the boot disk size, network bandwidth, instance type, or region. The two dominant steps (S3 upload 68 min, AMI import 36 min) scale with those factors, so the 1 hour 49 minute total is a single observation rather than a general estimate (large-disk timing is an open item in 10.5).
 
 #### Analysis
 

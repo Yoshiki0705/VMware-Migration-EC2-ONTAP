@@ -3,3 +3,15 @@ line-length = 100
 [lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 ignore = ["E501"]  # Line too long — handled by formatter
+
+# tools/ai_style_rules.py is vendored: a byte-identical copy of the Hub's
+# tools/ai_style_rules.py, kept in sync across spokes so a rule change in the Hub
+# cannot drift unnoticed here. The Hub lints with ruff defaults (E, F; line-length 88),
+# so this spoke's extra selects and wider line-length flag the copy even though it is
+# clean under the Hub config. Ignore exactly the extra codes it trips for this one path,
+# and exclude it from `ruff format` below — do NOT "clean it up", that forks the vendor.
+[lint.per-file-ignores]
+"tools/ai_style_rules.py" = ["SIM"]
+
+[format]
+exclude = ["tools/ai_style_rules.py"]
