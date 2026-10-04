@@ -31,7 +31,7 @@
 第 2 回の元になった検証の詳細は [AWS Transform の FSx for ONTAP サポート GA 検証レポート](docs/ja/atx-fsxn-ga-verification.md) にあります。移行の先の段階（コンテナ化・サーバーレス・DR・運用）の読み方は、Hub の [モダナイゼーション旅程マップ](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/reference/modernization-journey-map.md) にまとめています。
 
 > **移行ランブックに載らない前提**（切り戻せる時点、Finalize の容量ピーク、ACL 保持、LUN 配置と復旧の粒度）は、姉妹リポジトリの [FSx for ONTAP Adoption Playbook — 03 移行](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/ja/playbooks/03-migrate/README.md) にあります。ここでは複製せず参照します。
-> **ブロックの IOPS / スループットの実測**（4 KiB ランダムをどこまで詰められるか、プロビジョンド IOPS に対する頭打ち、iSCSI と NVMe/TCP の差）は、姉妹リポジトリの [S3-Burst-on-ONTAP-Files — perf-matrix](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/perf-matrix-results.md) にあります。このプロジェクトは移行経路の検証で、ブロック性能は測っていません。選定要素としての位置づけは [ONTAP 機能を選定要素として扱う](docs/ja/ontap-capability-selection-factors.md#ブロックで移行するときに先に効く前提) にまとめています。
+> **ブロックの IOPS / スループットの実測**（4 KiB ランダムが条件でどう動くか、iSCSI と NVMe/TCP の差）は、姉妹リポジトリの [S3-Burst-on-ONTAP-Files — perf-matrix](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/perf-matrix-results.md) にあります。このプロジェクトは移行経路の検証で、ブロック性能は測っていません。**達成 IOPS は特定の 1 台・特定の条件での値であり、サービスの上限ではありません。** 同じプロビジョンド値でもキャッシュの温まり方で達成値は大きく動き、プロビジョンド値を超える測定もあります（[AWS も「実際の IOPs はプロビジョニングされた IOPs を大幅に上回ることがある」と明記](https://aws.amazon.com/jp/blogs/news/san-a-million-iops-in-aws-from-amazon-fsx-netapp-ontap/)）。選定要素としての位置づけは [ONTAP 機能を選定要素として扱う](docs/ja/ontap-capability-selection-factors.md#ブロックで移行するときに先に効く前提) にまとめています。
 
 <details><summary>📂 全ドキュメント一覧</summary>
 
