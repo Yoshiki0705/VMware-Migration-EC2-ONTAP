@@ -31,6 +31,7 @@
 The verification behind Part 2 is detailed in the [AWS Transform FSx for ONTAP Support GA — Verification Report](docs/en/atx-fsxn-ga-verification.md). How to read the stages beyond migration (containerization, serverless, DR, operations) is laid out in the hub's [modernization journey map](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/reference/modernization-journey-map.md).
 
 > **The parts that a migration runbook does not carry** — where the rollback window closes, the capacity peak at Finalize, ACL preservation, and how LUN placement decides recovery granularity — are in the sibling repository [FSx for ONTAP Adoption Playbook — 03 Migrate](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook/blob/main/docs/en/playbooks/03-migrate/README.md). Referenced rather than copied here.
+> **Measured block IOPS / throughput** (how far 4 KiB random can be pushed, where it plateaus against the provisioned IOPS, the iSCSI-vs-NVMe/TCP difference) is in the sibling repository [S3-Burst-on-ONTAP-Files — perf-matrix](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/perf-matrix-results.md). This project verifies the migration path and does not measure block performance. How it frames the choice is in [treating ONTAP capabilities as selection factors](docs/en/ontap-capability-selection-factors.md#what-applies-first-when-migrating-as-block).
 
 <details><summary>📂 All Documents</summary>
 
