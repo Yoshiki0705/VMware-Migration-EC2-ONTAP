@@ -578,6 +578,20 @@ MAP 2.0 のタグは FSx for ONTAP **ファイルシステム**には付与さ�
 
 **再確認が必要になる条件**: pricing ページは "additional future capabilities may be introduced as paid features" と明示している。**無料であることは日付つきの事実であって、恒久的な性質ではない。** 経路を Custom agent に変える場合、および長期間このレポートを根拠に使う場合は、上記 2 つの出典を読み直す。
 
+### 9.10 ブロック性能と IOPS の実測の所在 [文書]
+
+**本レポートはブロック性能（IOPS / スループット）を実測していない。** 本検証はエージェント型移行の 1 回の通し（9.3 のスループット指針は容量計画の話で、達成 IOPS の測定ではない）であり、移行先 LUN の性能を VDBENCH 等で詰めてはいない。
+
+**同系の ONTAP 版（9.18.1 系、`ap-northeast-1`）でブロックの 4 KiB ランダム IOPS を詰めた実測は、姉妹プロジェクト [S3-Burst-on-ONTAP-Files](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files) にある。** セッション数 / キュー数をどこまで寄せられるか、プロビジョンド IOPS に対して何割で頭打ちになるかが、同一ファイルシステム上で iSCSI と NVMe/TCP の両方について記録されている。
+
+| 読み方 | 参照先 |
+|---|---|
+| 詰め方そのもの（セッション数・キュー数、ANA の課金前チェック、IOPS 変更後のクールダウン） | [ブロックプロトコルの測定ガイド](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/reference/block-protocol-testing-guide.md) |
+| 達成 IOPS の実測値 | [perf-matrix の結果](https://github.com/Yoshiki0705/S3-Burst-on-ONTAP-Files/blob/main/docs/ja/verification/perf-matrix-results.md) |
+| このプロジェクト側での位置づけ | [ブロックで移行するときに先に効く前提](ontap-capability-selection-factors.md#ブロックで移行するときに先に効く前提) |
+
+**値を引くときの前提**: 姉妹側の実測はいずれも 1 回の測定で、測定環境（世代・スループット容量・プロビジョンド IOPS・測定日）が併記されている。**本検証とは別のファイルシステム・別の目的の測定**なので、「移行先がこの値を出す」と読み替えない。環境が違えば上限そのものが変わる（9.3）。
+
 ## 10. FSx for ONTAP Adoption Playbook との連動
 
 姉妹リポジトリ [FSx for ONTAP Adoption Playbook](https://github.com/Yoshiki0705/FSx-for-ONTAP-Adoption-Playbook) 側に、本 GA を反映すべき箇所がある。
