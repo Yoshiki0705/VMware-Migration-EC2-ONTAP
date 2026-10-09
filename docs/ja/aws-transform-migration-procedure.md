@@ -514,3 +514,4 @@ aws mgn describe-source-servers --filters '{"sourceServerIDs": ["s-xxxxxxxxx"]}'
 - [Migrate VMware to Amazon EC2 & iSCSI-based FSx for ONTAP (NetApp Blog)](https://www.netapp.com/blog/aws-fsxn-blg-migrate-vmware-to-amazon-ec2-iscsi-based-fsx-for-ontap/)
 - [aws-samples/sample-vmware-collector-v2](https://github.com/aws-samples/sample-vmware-collector-v2) — PowerCLI インベントリ収集ツール
 - [Shift Toolkit EC2 移行手順書（本リポジトリ）](./shift-toolkit-ec2-procedure.md) — 比較対象
+- [FSx-for-ONTAP-App-Modernization-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-App-Modernization-Patterns) — VM とデータの移行が済んだ後の次の段階。データを FSx for ONTAP に置いたまま、Windows 上の .NET Framework アプリケーションを Linux 上の .NET へ段階的に移す。本リポジトリが扱うのは移行用の AWS Transform for VMware で、隣のリポジトリの段階 2 が使うのは AI Modernization Flow（AIMF）経由の AWS Transform custom（別の機能）
