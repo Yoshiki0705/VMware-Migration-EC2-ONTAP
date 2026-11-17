@@ -10,7 +10,7 @@
 
 ## 1. エグゼクティブサマリー
 
-私は、Amazon FSx for NetApp ONTAP を担当する立場、また AWS Community Builder として、VMware ワークロードの次の移行先を検討しているお客様に向けて、NetApp Shift Toolkit の VMware ESXi から Amazon EC2 / FSx for ONTAP への移行プレビューを検証しています。
+私は、Amazon FSx for NetApp ONTAP を担当する立場、また AWS Community Builder として、VMware ワークロードの次の移行先を検討している利用者に向けて、NetApp Shift Toolkit の VMware ESXi から Amazon EC2 / FSx for ONTAP への移行プレビューを検証しています。
 
 NetApp Shift Toolkit は、VM を異なるハイパーバイザー間で移行し、仮想ディスク形式の変換を支援するスタンドアロンツールです。NetApp のドキュメントでは、VMware ESXi、Microsoft Hyper-V、Oracle Linux Virtualization Manager、Red Hat OpenShift Virtualization などを対象に、ハイパーバイザーをまたいだ VM 移行を簡素化・高速化する製品として説明されています。[（出典）](https://docs.netapp.com/us-en/netapp-solutions-virtualization/migration/shift-toolkit-overview.html)
 
