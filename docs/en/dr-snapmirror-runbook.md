@@ -36,6 +36,8 @@ VMware ESXi + ONTAP                         Amazon EC2 (standby / on-demand laun
 
 > **Note**: The initial SnapMirror baseline transfer is not included in RPO (it is pre-DR preparation). RPO is determined by the incremental transfer interval.
 
+- How to define RTO and RPO as values the service owner sets from measurements in its own environment, and how to split the RTO into time points and intervals, is in the Cyber Resilience Patterns repository's [recovery objectives guide](https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns/blob/main/docs/en/recovery-objectives-guide.md). The values in this document are targets, not guarantees.
+
 ---
 
 ## 3. Preparation (Normal Operations)
