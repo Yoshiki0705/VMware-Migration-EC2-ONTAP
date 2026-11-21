@@ -36,6 +36,8 @@ VMware ESXi + ONTAP                         Amazon EC2 (待機/オンデマン�
 
 > **注意**: SnapMirror の初期ベースライン転送は RPO に含めない（DR 稼働前の準備）。RPO は増分転送間隔で決まる。
 
+- RTO と RPO を、サービス提供者が自環境の実測から決める値として定義し、RTO の時点と区間を分ける方法は、cyber リポジトリの[復旧時間と復旧点の目標のガイド](https://github.com/Yoshiki0705/FSx-for-ONTAP-Cyber-Resilience-Patterns/blob/main/docs/ja/recovery-objectives-guide.md)にあります。この文書の値は目標であって、保証値ではありません。
+
 ---
 
 ## 3. 事前準備（平常時）
