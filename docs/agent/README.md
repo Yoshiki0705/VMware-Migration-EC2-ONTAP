@@ -11,6 +11,7 @@ knowledge body may live there.
 | [output-standards.md](output-standards.md) | Writing or reviewing any document, commit message, or PR |
 | [quality-gates.md](quality-gates.md) | Running or changing a gate, or adding a dependency |
 | [diagrams.md](diagrams.md) | Creating or regenerating an architecture diagram |
+| [long-run-discipline.md](long-run-discipline.md) | Starting a multi-stage task: where decision records go, evidence vocabulary, auditor signals, variance-first measurement |
 
 Global rules (naming, vendor neutrality, writing style, public-output safety)
 come from user-level Kiro steering and apply to every repository. The documents
