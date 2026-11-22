@@ -302,7 +302,7 @@ EC2 インスタンスは Amazon Machine Image (AMI) からブートする必要
 
 ### 3.2.2 移行ツール選択ガイダンス
 
-顧客が VMware → EC2 移行ツールを選択する際の判断基準:
+利用者が VMware → EC2 移行ツールを選択する際の判断基準:
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
@@ -440,7 +440,7 @@ AWS Transform の料金は「サービス（エージェント）」と「生成
 |---|------|--------|
 | A1 | AWS Transform の FSx for ONTAP 移行は内部で Shift Toolkit / FlexClone / SnapMirror を使うのか、AWS ネイティブのブロックレプリケーションか? | Critical |
 | A2 | NetApp DII 連携は discovery のみか、移行実行フェーズにも及ぶか? | High |
-| A3 | NetApp として顧客に Shift Toolkit と AWS Transform をどう使い分け案内する想定か（置き換え / 補完 / 並存）? | High |
+| A3 | NetApp として利用者に Shift Toolkit と AWS Transform をどう使い分け案内する想定か（置き換え / 補完 / 並存）? | High |
 
 **B. ルート / OS ディスク（✅ P0 解決済み）**
 
@@ -569,9 +569,9 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 
 ## 5. 移行ツールの比較と選択ガイド
 
-### 5.0 顧客の最初の質問（Partner/SI 観点）
+### 5.0 利用者の最初の質問（Partner/SI 観点）
 
-パートナー/SI がこの検証結果を使って顧客と対話する際の**起点となる質問**:
+パートナー/SI がこの検証結果を使って利用者と対話する際の**起点となる質問**:
 
 > **「VMware の次をどうするか決めていますか? 今使っているストレージの種類によって、最適な移行パスが変わります。」**
 
@@ -582,7 +582,7 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 3. 移行規模は? → 大規模: CMC。中小規模/PoC: Shift Toolkit
 4. いつ移行したいか? → 今すぐ（GA ツールのみ）: MGN or CMC。将来計画: Shift Toolkit Early Preview を先行検証
 
-**パートナーが顧客に提供できる成果物（本検証から生成）:**
+**パートナーが利用者に提供できる成果物（本検証から生成）:**
 
 - ツール選択フローチャート（セクション 3.2.2）
 - ツール比較表（セクション 5.1）
@@ -591,7 +591,7 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 
 | ツール | 提供元 | アプローチ | FSx for ONTAP 対応 | OS ディスク先 | データディスク先 | 特徴 | 適用シナリオ |
 |--------|--------|-----------|-----------|-------------|--------------|------|------------|
-| **Shift Toolkit** | NetApp | ONTAP FlexClone + ディスク変換 | ✅ (OS→EBS + Data→FSx for ONTAP・Early Preview) | EBS (確定: Import/Export API or Direct Access API) | FSx for ONTAP iSCSI | ONTAP 顧客向け、数秒での変換、無償 | ONTAP NFS データストア利用中の環境 |
+| **Shift Toolkit** | NetApp | ONTAP FlexClone + ディスク変換 | ✅ (OS→EBS + Data→FSx for ONTAP・Early Preview) | EBS (確定: Import/Export API or Direct Access API) | FSx for ONTAP iSCSI | ONTAP 利用者向け、数秒での変換、無償 | ONTAP NFS データストア利用中の環境 |
 | **Cirrus Migrate Cloud (CMC)** | Cirrus Data Solutions | エージェントベース・ブロックレプリケーション | ✅ (iSCSI LUN 自動構成) | EBS | FSx for ONTAP / EBS | YAML ベース自動化 (MigrateOps)、VM 稼働中に移行 | 大規模エンタープライズ移行 |
 | **AWS MGN (Application Migration Service)** | AWS | エージェントベース・継続レプリケーション | ❌ (EBS のみ) | EBS | EBS | AWS 標準ツール、幅広い OS 対応、無償 | 汎用的な Lift & Shift |
 | **BlueXP Workload Factory Migration Advisor** | NetApp/AWS | 計画 + 最適化 + 自動デプロイ | ✅ (計画・ストレージ最適化) | EBS gp3 | FSx for ONTAP iSCSI | RVTools/PowerCLI 連携、コスト比較、IaC 出力 | 移行計画・サイジング | <!-- allow:naming -->
@@ -620,7 +620,7 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 
 ### 6.0 検証の成功指標（検証開始前に定義）
 
-この検証は、VMware 顧客が EC2 + FSx for ONTAP へ移行する際の**意思決定材料を提供する**ことをゴールとする。「Shift Toolkit で移行できた」だけでは成功ではなく、以下の指標を満たすことで「顧客が判断できる状態」を達成する。
+この検証は、VMware 利用者が EC2 + FSx for ONTAP へ移行する際の**意思決定材料を提供する**ことをゴールとする。「Shift Toolkit で移行できた」だけでは成功ではなく、以下の指標を満たすことで「利用者が判断できる状態」を達成する。
 
 | # | 成功指標 | 目標値 | 測定方法 | 対応ブログ記事 |
 |---|---------|--------|---------|-------------|
@@ -641,12 +641,12 @@ Shift Toolkit の価値は、AWS、NetApp、VMware のいずれか一社の視�
 | テストデータ（ダミー）でのディスク変換テスト | 本番データでの移行 |
 | FSx for ONTAP iSCSI パフォーマンスベンチマーク | Early Preview の結果を「GA 時のパフォーマンス保証」として記載 |
 | 移行後の ONTAP 機能動作確認 | Early Preview の NDA 対象情報の公開 |
-| ツール選択の判断材料としての結果共有 | GA されていない機能を「推奨」として顧客に案内 |
+| ツール選択の判断材料としての結果共有 | GA されていない機能を「推奨」として利用者に案内 |
 | NetApp との技術的フィードバック共有 | 未公開の Early Preview 手順をブログに掲載（公開可能範囲を事前確認） |
 
 **「So what?」— この検証で何が分かれば、誰が何を判断できるか:**
 
-> この検証の結果をもって、ONTAP NFS データストアを使用中の VMware 顧客が「データディスクを FSx for ONTAP に移行する価値があるか」「MGN/CMC と比較して Shift Toolkit を選ぶ理由があるか」を定量的に判断できる状態を目指す。
+> この検証の結果をもって、ONTAP NFS データストアを使用中の VMware 利用者が「データディスクを FSx for ONTAP に移行する価値があるか」「MGN/CMC と比較して Shift Toolkit を選ぶ理由があるか」を定量的に判断できる状態を目指す。
 
 ### Phase 1: 環境準備
 
