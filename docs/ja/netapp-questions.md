@@ -78,7 +78,7 @@ EC2 は AMI（EBS バックド）からのみブート可能で、FSx for ONTAP 
 |---|------|--------|-----------|
 | Q5 | AWS Transform の FSx for ONTAP 移行は内部で Shift Toolkit / FlexClone / SnapMirror を利用するのか、AWS ネイティブのブロックレプリケーションか? | Critical | 🔶 部分回答（実測 2026-09-04） |
 | Q6 | NetApp DII 連携は AWS Transform の discovery（計画）フェーズのみか、移行実行フェーズにも及ぶか? | High | ⬜ 未回答 |
-| Q7 | NetApp として、顧客への Shift Toolkit と AWS Transform の使い分け案内方針は（置き換え / 補完 / 並存）? | High | ⬜ 未回答（**NetApp にしか答えられない**。実測では出ない） |
+| Q7 | NetApp として、利用者への Shift Toolkit と AWS Transform の使い分け案内方針は（置き換え / 補完 / 並存）? | High | ⬜ 未回答（**NetApp にしか答えられない**。実測では出ない） |
 | Q8 | AWS Transform でコンピュート（ルート = EBS）、Shift Toolkit でデータ（FSx for ONTAP）を分担する構成は推奨構成として成立するか? | High | ✅ 確認済み |
 
 ### Q8 回答根拠（公式 Shift Toolkit EC2 手順書 2026-06）
