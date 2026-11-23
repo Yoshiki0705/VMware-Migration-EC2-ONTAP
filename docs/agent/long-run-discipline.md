@@ -38,6 +38,7 @@ Location follows this repository's existing habit, not the Hub's `.agents/tasks/
   sections to it rather than adding a new name.
 
 ## Evidence tier vocabulary
+
 When the work involves verification, tag each `Decisions` basis with the words
 this repository already uses. Do not introduce new ones. Two documents define
 them: the status legend in [../en/netapp-questions.md](../en/netapp-questions.md)
