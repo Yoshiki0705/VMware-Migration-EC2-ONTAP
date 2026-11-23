@@ -1,0 +1,10 @@
+vmware-migration-ec2-ontap
+Copyright (c) 2026 Yoshiki0705 (MIT License, see LICENSE)
+This repository contains material derived from the following work.
+unslop-ai-app by Minoru Onda (https://github.com/minorun365/unslop-ai-app),
+Copyright 2026 Minoru Onda, licensed under the Apache License 2.0.
+Derived files:
+  - tools/check-ui.mjs (modified; the full license is in tools/LICENSE, which applies to this file only; the other files under tools/ are under the MIT License)
+Upstream notes that part of its content was rewritten from unslop by Damir Sokolovsky
+(https://github.com/heydamir/unslop), licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/).
